@@ -5,10 +5,16 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Prevent one broken headless test from holding a runner indefinitely.
+concurrency:
+  group: from-zero-android-build
+  cancel-in-progress: true
+
 jobs:
   android:
     name: Import models, validate controls, export Android
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     container:
       image: barichello/godot-ci:4.6.3
     steps:
@@ -49,10 +55,29 @@ jobs:
       - name: Run gameplay and full 360-degree touch control tests
         shell: bash
         run: |
-          set -eu
-          godot --headless --path . --script res://tests/economy_tests.gd
-          FROMZERO_TEST_MOBILE=1 godot --headless --path . --script res://tests/mobile_controls_tests.gd
-          timeout 125 godot --headless --path . --quit-after 70
+          set -euo pipefail
+          run_checked_test() {
+            local script="$1"
+            local required_line="$2"
+            local log_file
+            log_file="$(mktemp)"
+            echo "::group::Godot test: $script"
+            if ! timeout --signal=TERM --kill-after=5s 50s godot --headless --path . --script "$script" --quit-after 300 >"$log_file" 2>&1; then
+              cat "$log_file"
+              echo "::error::Godot test failed or timed out: $script"
+              exit 1
+            fi
+            cat "$log_file"
+            if ! grep -Fq "$required_line" "$log_file"; then
+              echo "::error::Godot exited without reaching the PASS marker: $script"
+              exit 1
+            fi
+            echo "::endgroup::"
+          }
+          run_checked_test res://tests/economy_tests.gd "CONTRACT ECONOMY TESTS: PASS"
+          export FROMZERO_TEST_MOBILE=1
+          run_checked_test res://tests/mobile_controls_tests.gd "MOBILE 3 RESOLUTIONS + 8-WAY TOUCH + MENU: PASS"
+          timeout --signal=TERM --kill-after=5s 90s godot --headless --path . --quit-after 70
 
       - name: Build Android debug APK with 3D assets
         shell: bash
