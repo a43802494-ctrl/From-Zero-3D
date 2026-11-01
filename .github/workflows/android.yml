@@ -11,6 +11,7 @@ jobs:
   android:
     name: Build Android arm64 debug APK
     runs-on: ubuntu-24.04
+    timeout-minutes: 12
     container:
       image: barichello/godot-ci:4.6.3
     steps:
@@ -34,9 +35,13 @@ jobs:
         shell: bash
         run: |
           set -eu
-          godot --headless --path . --script res://tests/economy_tests.gd
+          echo 'START economy unit tests'
+          timeout 30 godot --headless --path . --script res://tests/economy_tests.gd
+          echo 'FINISHED economy unit tests'
           mkdir -p build
-          timeout 120 godot --headless --path . --quit-after 60
+          echo 'START game startup smoke test'
+          timeout 75 godot --headless --path . --quit-after 60
+          echo 'FINISHED game startup smoke test'
 
       - name: Export debuggable Android APK
         shell: bash
