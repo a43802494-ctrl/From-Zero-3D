@@ -191,7 +191,7 @@ func streets() -> void:
 	sphere(self, Vector3(0, 2.55, 0), Vector3(1.0, 1.0, 1.0), palette["gold"])
 	box(self, Vector3(0, 0.63, 0), Vector3(1.8, 0.24, 1.8), palette["dark"])
 
-func sign(parent: Node3D, txt: String, pos: Vector3, flip: bool = false, scale3d: float = 0.007) -> void:
+func make_shop_sign(parent: Node3D, txt: String, pos: Vector3, flip: bool = false, scale3d: float = 0.007) -> void:
 	var lb := Label3D.new()
 	lb.text = txt
 	lb.font_size = 64
@@ -226,7 +226,7 @@ func make_shop(point: Dictionary, idx: int) -> void:
 	for x in [-4.3, 4.3]:
 		column(root, Vector3(x, 6.75, 0), 0.43, 0.65, accent, 8)
 	# Built-in label is geometry inside the world, not a flat screenshot.
-	sign(root, point["title"], Vector3(0, 5.4, pane_z + (0.25 if not back else -0.25)), back, 0.0065)
+	make_shop_sign(root, point["title"], Vector3(0, 5.4, pane_z + (0.25 if not back else -0.25)), back, 0.0065)
 	# Floor signs, interaction light and tactile colored floor tile.
 	var tile_pos: Vector3 = point["position"]
 	box(self, tile_pos + Vector3(0, 0.02, 0), Vector3(4.8, 0.06, 3.9), palette["sidewalk"])
