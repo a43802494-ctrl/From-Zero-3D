@@ -19,6 +19,8 @@ jobs:
         shell: bash
         run: |
           set -eu
+          apt-get update -qq
+          apt-get install -y --no-install-recommends python3 ca-certificates
           python3 tools/fetch_models.py
           test -s assets/models/city-kit-commercial/building-a.glb
           test -s assets/models/mini-characters/character-male-a.glb
