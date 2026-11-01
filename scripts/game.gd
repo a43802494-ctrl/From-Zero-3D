@@ -46,6 +46,12 @@ func _ready() -> void:
 	hud.contract_board_closed.connect(close_contract_board)
 	hud.run_changed.connect(func(yes: bool) -> void: player.run_toggle = yes)
 	hud.touch_moved.connect(func(direction: Vector2) -> void: player.set_touch_move(direction))
+	hud.settings_changed.connect(func(sensitivity: float, high_quality: bool) -> void:
+		player.look_sensitivity = sensitivity
+		world.configure_graphics(high_quality)
+	)
+	player.look_sensitivity = hud.look_sens
+	world.configure_graphics(hud.quality_high)
 	create_waypoint()
 	create_audio()
 	load_progress()

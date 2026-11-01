@@ -7,6 +7,7 @@ const ACCELERATION := 15.0
 const JUMP_VELOCITY := 6.5
 const GRAVITY := 18.0
 const MOUSE_SENS := 0.0024
+var look_sensitivity := 1.0
 
 var touch_move := Vector2.ZERO
 var look_touch_index := -1
@@ -122,17 +123,17 @@ func _input(event: InputEvent) -> void:
 		look_touch_index = -1
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		look(event.relative, MOUSE_SENS)
+		look(event.relative, MOUSE_SENS * look_sensitivity)
 	elif event is InputEventScreenTouch:
 		var view_size := get_viewport().get_visible_rect().size
 		if event.pressed and look_touch_index == -1:
 			# The lower-right buttons are for interaction, not looking around.
-			if event.position.x > view_size.x * 0.47 and not (event.position.x > view_size.x * 0.78 and event.position.y > view_size.y * 0.65):
+			if event.position.x > view_size.x * 0.48 and not (event.position.x > view_size.x * 0.72 and event.position.y > view_size.y * 0.63):
 				look_touch_index = event.index
 		elif not event.pressed and event.index == look_touch_index:
 			look_touch_index = -1
 	elif event is InputEventScreenDrag and event.index == look_touch_index:
-		look(event.relative, 0.0030)
+		look(event.relative, 0.0030 * look_sensitivity)
 
 func look(relative: Vector2, sensitivity: float) -> void:
 	rotate_y(-relative.x * sensitivity)
@@ -154,7 +155,7 @@ func _physics_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): d.x -= 1.0
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): d.x += 1.0
 	d = d.limit_length()
-	var direction := (global_transform.basis * Vector3(d.x, 0, d.y)).normalized()
+	var direction := (Basis(Vector3.UP, rotation.y) * Vector3(d.x, 0.0, d.y)).normalized()
 	var running := run_toggle or Input.is_key_pressed(KEY_SHIFT)
 	var speed := (RUN_SPEED if running else WALK_SPEED) * (1.35 if has_scooter else 1.0) * fatigue_factor
 	velocity.x = move_toward(velocity.x, direction.x * speed, ACCELERATION * delta)

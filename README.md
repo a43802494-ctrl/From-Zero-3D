@@ -1,15 +1,22 @@
-# FROM ZERO — RISE CITY
+# FROM ZERO — RISE CITY (internal art and controls development build)
 
-A native Android first-person 3D life and business game powered by Godot 4.6.3.
+A Godot 4.6 first-person 3D mobile life simulator with jobs, delivery economy,
+a main menu (PLAY/⚙ SETTINGS), adjustable volume/quality/sensitivity, saved
+progress, 360-degree thumbstick and a small curated city built from real CC0 3D models.
 
-**Status: internal development; not public v1.0.** Do not distribute until visual quality, functionality, controls and real-device performance meet the release gates in README_AR.md.
+## Build
 
-## Development
+```bash
+python3 tools/fetch_models.py
+# Then open in Godot 4.6 and import the models, or let GitHub Actions do both.
+```
 
-- Main scene: `scenes/main.tscn`
-- Gameplay: `scripts/game.gd`
-- Procedural city: `scripts/world.gd`
-- First-person controls: `scripts/player.gd`
-- Android build: `.github/workflows/android.yml`
+GitHub Actions builds an Android debug APK and publishes it under the run's Artifacts.
+This is an *internal development build*, **not** an app-store release and not a
+verified photorealistic or production-quality game. Test on an Android device.
 
-[Arabic documentation and release criteria](README_AR.md)
+## Art source and licensing
+
+3D models by Kenney under CC0 1.0; downloaded via
+[Hidencod/tge-assets](https://github.com/Hidencod/tge-assets).
+See `assets/README.md`.

@@ -1,7 +1,5 @@
 .godot/
-.android/
-.import/
 build/
-*.apk
-*.aab
+assets/models/**/*.glb
+*.tmp
 .DS_Store

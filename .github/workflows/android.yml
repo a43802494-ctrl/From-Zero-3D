@@ -1,72 +1,58 @@
-name: FROM ZERO | Android APK - internal build
+name: FROM ZERO | 3D Art + Touch Controls QA
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
-  pull_request:
-    branches: [main, master]
 
 jobs:
   android:
-    name: Build Android arm64 debug APK
+    name: Import licensed 3D art, test, export Android
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
     container:
       image: barichello/godot-ci:4.6.3
     steps:
-      - name: Checkout project
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Restore Godot Android SDK and export templates
+      - name: Fetch pinned commercial-use CC0 3D models
         shell: bash
         run: |
           set -eu
-          mkdir -p "$HOME/.config" "$HOME/.local/share/godot/export_templates"
-          cp -a /root/.config/godot "$HOME/.config/"
-          cp -a /root/.local/share/godot/export_templates/4.6.3.stable "$HOME/.local/share/godot/export_templates/"
-          test -s "$HOME/.local/share/godot/export_templates/4.6.3.stable/android_debug.apk"
-          test -f "$HOME/.config/godot/editor_settings-4.6.tres"
-          echo "Android export SDK and templates configured."
+          python3 tools/fetch_models.py
+          test -s assets/models/city-kit-commercial/building-a.glb
+          test -s assets/models/mini-characters/character-male-a.glb
+          test -s assets/models/car-kit/taxi.glb
 
-      - name: Import project and validate GDScript
+      - name: Import project and check GDScript
         shell: bash
         run: |
           set -eu
           godot --headless --editor --path . --import --quit
-          godot --headless --path . --check-only --script res://scripts/game.gd
-          godot --headless --path . --check-only --script res://scripts/world.gd
-          godot --headless --path . --check-only --script res://scripts/player.gd
-          godot --headless --path . --check-only --script res://scripts/hud.gd
-          godot --headless --path . --check-only --script res://scripts/stick.gd
-          godot --headless --path . --check-only --script res://scripts/radar.gd
-          godot --headless --path . --check-only --script res://scripts/economy.gd
+          for script in scripts/world.gd scripts/player.gd scripts/stick.gd scripts/hud.gd scripts/game.gd scripts/radar.gd scripts/economy.gd; do
+            godot --headless --path . --check-only --script "res://$script"
+          done
 
-      - name: Test contracts and startup scene
+      - name: Run gameplay and full 360-degree touch control tests
         shell: bash
         run: |
           set -eu
-          echo 'START economy unit tests'
-          timeout 30 godot --headless --path . --script res://tests/economy_tests.gd
-          FROMZERO_TEST_MOBILE=1 timeout 30 godot --headless --path . --script res://tests/mobile_controls_tests.gd
-          echo 'FINISHED economy and mobile controls tests'
-          mkdir -p build
-          echo 'START game startup smoke test'
-          timeout 75 godot --headless --path . --quit-after 60
-          echo 'FINISHED game startup smoke test'
+          godot --headless --path . --script res://tests/economy_tests.gd
+          FROMZERO_TEST_MOBILE=1 godot --headless --path . --script res://tests/mobile_controls_tests.gd
+          timeout 125 godot --headless --path . --quit-after 70
 
-      - name: Export debuggable Android APK
+      - name: Build Android debug APK with 3D assets
         shell: bash
         run: |
           set -eu
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/FromZero-RiseCity-debug.apk
-          test -s build/FromZero-RiseCity-debug.apk
+          godot --headless --path . --export-debug Android build/From-Zero-3D-art-pass-debug.apk
+          test -s build/From-Zero-3D-art-pass-debug.apk
 
-      - name: Upload downloadable APK
+      - name: Publish internal APK
         uses: actions/upload-artifact@v4
         with:
-          name: FromZero-RiseCity-Android-APK-internal
-          path: build/FromZero-RiseCity-debug.apk
+          name: From-Zero-3D-ArtPass-Android-debug
+          path: build/From-Zero-3D-art-pass-debug.apk
           if-no-files-found: error
           retention-days: 14

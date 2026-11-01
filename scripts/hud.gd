@@ -2,6 +2,7 @@ extends CanvasLayer
 class_name GameHUD
 
 signal play_pressed
+signal settings_changed(look_value: float, high_quality: bool)
 signal interact_pressed
 signal run_changed(enabled: bool)
 signal touch_moved(direction: Vector2)
@@ -38,6 +39,13 @@ var hud_prompt: Panel
 var hud_pause_button: Button
 var hud_crosshair: Label
 var ui_layout_size := Vector2.ZERO
+var settings_screen: Control
+var startup_card: PanelContainer
+var settings_open := false
+var look_sens := 1.0
+var quality_high := true
+var volume_percent := 80.0
+
 
 func _ready() -> void:
 	is_mobile = OS.has_feature("mobile") or OS.get_environment("FROMZERO_TEST_MOBILE") == "1"
@@ -50,6 +58,8 @@ func _ready() -> void:
 	create_startup()
 	create_pause_menu()
 	create_contract_board()
+	create_settings_screen()
+	load_settings()
 	# No pre-parent negative offsets: every gameplay control is placed in screen coordinates.
 	call_deferred("update_hud_layout")
 
@@ -236,62 +246,73 @@ func toast(message: String) -> void:
 	)
 
 func create_startup() -> void:
-	startup = Control.new()
-	startup.mouse_filter = Control.MOUSE_FILTER_STOP
-	root.add_child(startup)
-	startup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var shadow := ColorRect.new()
-	shadow.color = Color(0.027, 0.063, 0.098, 0.91)
-	shadow.set_anchors_preset(Control.PRESET_FULL_RECT)
-	startup.add_child(shadow)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	startup.add_child(center)
-	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(620, 520)
-	card.add_theme_stylebox_override("panel", style(Color("102739"), Color("507b87"), 27, 2))
-	center.add_child(card)
-	var margins := MarginContainer.new()
-	margins.add_theme_constant_override("margin_left", 47)
-	margins.add_theme_constant_override("margin_right", 47)
-	margins.add_theme_constant_override("margin_top", 33)
-	margins.add_theme_constant_override("margin_bottom", 33)
-	card.add_child(margins)
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 12)
-	margins.add_child(content)
-	var tag := Label.new()
-	tag.text = "THE CITY IS YOURS  •  FIRST-PERSON LIFE SIM"
-	tag.add_theme_font_size_override("font_size", 16)
-	tag.add_theme_color_override("font_color", Color("f8bd69"))
-	content.add_child(tag)
-	var title := Label.new()
-	title.text = "FROM ZERO"
-	title.add_theme_font_size_override("font_size", 68)
-	title.add_theme_color_override("font_color", Color("f7f0df"))
-	content.add_child(title)
-	var subtitle := Label.new()
-	subtitle.text = "RISE CITY  /  CHAPTER ONE"
-	subtitle.add_theme_font_size_override("font_size", 20)
-	subtitle.add_theme_color_override("font_color", Color("8dced2"))
-	content.add_child(subtitle)
-	var separator := HSeparator.new()
-	content.add_child(separator)
-	var story := Label.new()
-	story.text = "One city. 120 pounds. Nothing to lose.\n\nTake your first delivery, earn your first paycheck,\nupgrade your ride, and open your first business.\nEvery empire starts with a single decision."
-	story.add_theme_font_size_override("font_size", 19)
-	story.add_theme_color_override("font_color", Color("cadce0"))
-	content.add_child(story)
-	var button := make_button("ENTER THE CITY  >", content, Vector2.ZERO, Vector2(520, 65), true)
-	button.pressed.connect(func() -> void:
-		startup.visible = false
-		play_pressed.emit()
-	)
-	var hint := Label.new()
-	hint.text = "AN ORIGINAL GODOT 3D ANDROID GAME"
-	hint.add_theme_font_size_override("font_size", 13)
-	hint.add_theme_color_override("font_color", Color("83a4b2"))
-	content.add_child(hint)
+    startup = Control.new()
+    startup.mouse_filter = Control.MOUSE_FILTER_STOP
+    root.add_child(startup)
+    startup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    # Underlying 3D city remains visible as a cinematic background.
+    var wash := ColorRect.new()
+    wash.color = Color(0.014, 0.031, 0.048, 0.62)
+    startup.add_child(wash)
+    wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    var edge := ColorRect.new()
+    edge.color = Color("f3bb67")
+    edge.anchor_bottom = 1.0
+    edge.offset_right = 9.0
+    startup.add_child(edge)
+    var center := CenterContainer.new()
+    startup.add_child(center)
+    center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    startup_card = PanelContainer.new()
+    startup_card.custom_minimum_size = Vector2(570, 510)
+    startup_card.add_theme_stylebox_override("panel", style(Color(0.025, 0.061, 0.092, 0.90), Color("d6ae76"), 24, 2))
+    center.add_child(startup_card)
+    var margin := MarginContainer.new()
+    for side in ["left","right"]: margin.add_theme_constant_override("margin_"+side, 42)
+    for side in ["top","bottom"]: margin.add_theme_constant_override("margin_"+side, 25)
+    startup_card.add_child(margin)
+    var content := VBoxContainer.new()
+    content.add_theme_constant_override("separation", 12)
+    margin.add_child(content)
+    var kicker := Label.new()
+    kicker.text = "CHAPTER 01   /   THE FIRST HUNDRED"
+    kicker.add_theme_font_size_override("font_size", 18)
+    kicker.add_theme_color_override("font_color", Color("f6bd69"))
+    content.add_child(kicker)
+    var name_label := Label.new()
+    name_label.text = "FROM ZERO"
+    name_label.add_theme_font_size_override("font_size", 65)
+    name_label.add_theme_color_override("font_color", Color("fff5e5"))
+    content.add_child(name_label)
+    var chapter := Label.new()
+    chapter.text = "RISE CITY    •    A FIRST-PERSON LIFE SIM"
+    chapter.add_theme_font_size_override("font_size", 20)
+    chapter.add_theme_color_override("font_color", Color("b6d4d7"))
+    content.add_child(chapter)
+    var line := HSeparator.new()
+    content.add_child(line)
+    var story := Label.new()
+    story.text = "120 EGP. No shortcuts. One city full of chances.\nTake contracts, build your reputation and own your future."
+    story.add_theme_font_size_override("font_size", 18)
+    story.add_theme_color_override("font_color", Color("d9e3e0"))
+    content.add_child(story)
+    var spacer := Control.new()
+    spacer.custom_minimum_size = Vector2(1,12)
+    content.add_child(spacer)
+    var btn_play := make_button("▶   PLAY", content, Vector2.ZERO, Vector2(465,70), true)
+    btn_play.add_theme_font_size_override("font_size", 30)
+    btn_play.pressed.connect(func() -> void:
+        startup.visible = false
+        play_pressed.emit()
+    )
+    var btn_gear := make_button("⚙   SETTINGS", content, Vector2.ZERO, Vector2(465,62), false)
+    btn_gear.add_theme_font_size_override("font_size", 23)
+    btn_gear.pressed.connect(open_settings)
+    var footer := Label.new()
+    footer.text = "3D EXPLORATION   •   WORK   •   EARN   •   GROW"
+    footer.add_theme_font_size_override("font_size", 14)
+    footer.add_theme_color_override("font_color", Color("a3b1b4"))
+    content.add_child(footer)
 
 func create_pause_menu() -> void:
 	pause_screen = Control.new()
@@ -316,6 +337,8 @@ func create_pause_menu() -> void:
 	col.add_child(title)
 	var resume := make_button("BACK TO THE CITY", col, Vector2.ZERO, Vector2(340, 70), true)
 	resume.pressed.connect(func() -> void: pause_pressed.emit())
+	var pause_settings := make_button("⚙ SETTINGS", col, Vector2.ZERO, Vector2(340,63))
+	pause_settings.pressed.connect(open_settings)
 	var info := Label.new()
 	info.text = "Progress saves automatically after each transaction."
 	info.add_theme_color_override("font_color", Color("b5c9d3"))
@@ -323,6 +346,112 @@ func create_pause_menu() -> void:
 
 func show_pause(yes: bool) -> void:
 	pause_screen.visible = yes
+
+func create_settings_screen() -> void:
+    settings_screen = Control.new()
+    settings_screen.visible = false
+    settings_screen.mouse_filter = Control.MOUSE_FILTER_STOP
+    root.add_child(settings_screen)
+    settings_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    var tint := ColorRect.new()
+    tint.color = Color(0.008,0.022,0.036,0.94)
+    settings_screen.add_child(tint)
+    tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    var center := CenterContainer.new()
+    settings_screen.add_child(center)
+    center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    var card := PanelContainer.new()
+    card.custom_minimum_size = Vector2(560,425)
+    card.add_theme_stylebox_override("panel", style(Color("122635"),Color("ddae65"),22,2))
+    center.add_child(card)
+    var outer := MarginContainer.new()
+    for side in ["left","right","top","bottom"]: outer.add_theme_constant_override("margin_"+side, 30)
+    card.add_child(outer)
+    var content := VBoxContainer.new()
+    content.add_theme_constant_override("separation", 15)
+    outer.add_child(content)
+    var title := Label.new()
+    title.text = "⚙  SETTINGS"
+    title.add_theme_font_size_override("font_size", 34)
+    title.add_theme_color_override("font_color",Color("fff5df"))
+    content.add_child(title)
+    var volume_lbl := Label.new()
+    volume_lbl.text = "MASTER VOLUME"
+    volume_lbl.add_theme_font_size_override("font_size",20)
+    content.add_child(volume_lbl)
+    var volume_slider := HSlider.new()
+    volume_slider.name = "VolumeSlider"
+    volume_slider.min_value = 0
+    volume_slider.max_value = 100
+    volume_slider.step = 5
+    volume_slider.value = volume_percent
+    volume_slider.custom_minimum_size.y = 35
+    content.add_child(volume_slider)
+    volume_slider.value_changed.connect(func(v: float) -> void:
+        volume_percent = v
+        apply_settings()
+    )
+    var look_lbl := Label.new()
+    look_lbl.text = "CAMERA SENSITIVITY"
+    look_lbl.add_theme_font_size_override("font_size",20)
+    content.add_child(look_lbl)
+    var sensitivity := HSlider.new()
+    sensitivity.name = "LookSlider"
+    sensitivity.min_value = 0.5
+    sensitivity.max_value = 2.0
+    sensitivity.step = 0.1
+    sensitivity.value = look_sens
+    sensitivity.custom_minimum_size.y = 34
+    content.add_child(sensitivity)
+    sensitivity.value_changed.connect(func(v: float) -> void:
+        look_sens = v
+        apply_settings()
+    )
+    var shadows := CheckButton.new()
+    shadows.name = "ShadowsToggle"
+    shadows.text = "QUALITY SHADOWS & ATMOSPHERE"
+    shadows.button_pressed = quality_high
+    shadows.add_theme_font_size_override("font_size",18)
+    content.add_child(shadows)
+    shadows.toggled.connect(func(v: bool) -> void:
+        quality_high = v
+        apply_settings()
+    )
+    var back := make_button("SAVE & BACK",content,Vector2.ZERO,Vector2(490,60),true)
+    back.pressed.connect(func() -> void:
+        save_settings()
+        settings_screen.visible = false
+        settings_open = false
+    )
+
+func open_settings() -> void:
+    settings_open = true
+    settings_screen.visible = true
+
+func apply_settings() -> void:
+    AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.0001,volume_percent/100.0)))
+    settings_changed.emit(look_sens, quality_high)
+
+func save_settings() -> void:
+    var config := ConfigFile.new()
+    config.set_value("audio","volume",volume_percent)
+    config.set_value("input","look",look_sens)
+    config.set_value("graphics","shadows",quality_high)
+    config.save("user://settings.cfg")
+
+func load_settings() -> void:
+    var cfg := ConfigFile.new()
+    if cfg.load("user://settings.cfg") == OK:
+        volume_percent = float(cfg.get_value("audio","volume",80.0))
+        look_sens = float(cfg.get_value("input","look",1.0))
+        quality_high = bool(cfg.get_value("graphics","shadows",true))
+    var sliders := settings_screen.find_children("*","HSlider",true,false)
+    for item in sliders:
+        if item.name == "VolumeSlider": item.value = volume_percent
+        elif item.name == "LookSlider": item.value = look_sens
+    var shadows := settings_screen.find_child("ShadowsToggle",true,false) as CheckButton
+    if shadows: shadows.button_pressed = quality_high
+    apply_settings()
 
 func create_contract_board() -> void:
 	contract_panel = Control.new()
