@@ -9,6 +9,7 @@ const GRAVITY := 18.0
 const MOUSE_SENS := 0.0024
 
 var touch_move := Vector2.ZERO
+var look_touch_index := -1
 var run_toggle := false
 var control_active := false
 var has_scooter := false
@@ -64,7 +65,8 @@ func _ready() -> void:
 	band.material_override = tape
 	held_package.add_child(band)
 	held_package.visible = false
-	build_first_person_arms()
+	# Removed the placeholder sphere hands: they looked like floating balls.
+	# Professional hand meshes and proper animations belong in the art pass.
 
 	footstep_player = AudioStreamPlayer.new()
 	footstep_player.volume_db = -14.0
@@ -101,6 +103,9 @@ func build_first_person_arms() -> void:
 
 func set_playing(enabled: bool) -> void:
 	control_active = enabled
+	if not enabled:
+		touch_move = Vector2.ZERO
+		look_touch_index = -1
 	if OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	else:
@@ -112,14 +117,22 @@ func set_touch_move(value: Vector2) -> void:
 func set_package(yes: bool) -> void:
 	held_package.visible = yes
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not control_active:
+		look_touch_index = -1
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		look(event.relative, MOUSE_SENS)
-	elif event is InputEventScreenDrag:
-		if event.position.x > get_viewport().get_visible_rect().size.x * 0.47:
-			look(event.relative, 0.0038)
+	elif event is InputEventScreenTouch:
+		var view_size := get_viewport().get_visible_rect().size
+		if event.pressed and look_touch_index == -1:
+			# The lower-right buttons are for interaction, not looking around.
+			if event.position.x > view_size.x * 0.47 and not (event.position.x > view_size.x * 0.78 and event.position.y > view_size.y * 0.65):
+				look_touch_index = event.index
+		elif not event.pressed and event.index == look_touch_index:
+			look_touch_index = -1
+	elif event is InputEventScreenDrag and event.index == look_touch_index:
+		look(event.relative, 0.0030)
 
 func look(relative: Vector2, sensitivity: float) -> void:
 	rotate_y(-relative.x * sensitivity)

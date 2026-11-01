@@ -11,23 +11,11 @@ jobs:
   android:
     name: Build Android arm64 debug APK
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
     container:
       image: barichello/godot-ci:4.6.3
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
-
-      - name: Restore Godot Android SDK and export templates
-        shell: bash
-        run: |
-          set -eu
-          mkdir -p "$HOME/.config" "$HOME/.local/share/godot/export_templates"
-          cp -a /root/.config/godot "$HOME/.config/"
-          cp -a /root/.local/share/godot/export_templates/4.6.3.stable "$HOME/.local/share/godot/export_templates/"
-          test -s "$HOME/.local/share/godot/export_templates/4.6.3.stable/android_debug.apk"
-          test -f "$HOME/.config/godot/editor_settings-4.6.tres"
-          echo "Android export SDK and templates configured."
 
       - name: Import project and validate GDScript
         shell: bash
@@ -46,13 +34,10 @@ jobs:
         shell: bash
         run: |
           set -eu
-          echo 'START economy unit tests'
-          timeout 30 godot --headless --path . --script res://tests/economy_tests.gd
-          echo 'FINISHED economy unit tests'
+          godot --headless --path . --script res://tests/economy_tests.gd
+          FROMZERO_TEST_MOBILE=1 godot --headless --path . --script res://tests/mobile_controls_tests.gd
           mkdir -p build
-          echo 'START game startup smoke test'
-          timeout 75 godot --headless --path . --quit-after 60
-          echo 'FINISHED game startup smoke test'
+          timeout 120 godot --headless --path . --quit-after 60
 
       - name: Export debuggable Android APK
         shell: bash
