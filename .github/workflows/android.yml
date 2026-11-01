@@ -1,4 +1,4 @@
-name: FROM ZERO | 3D Art + Touch Controls QA
+name: FROM ZERO | Mobile Visual Rebuild v0.5
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   android:
-    name: Import licensed 3D art, test, export Android
+    name: Import models, validate controls, export Android
     runs-on: ubuntu-24.04
     container:
       image: barichello/godot-ci:4.6.3
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Fetch pinned commercial-use CC0 3D models
+      - name: Fetch licensed 3D models and animated NPC
         shell: bash
         run: |
           set -eu
@@ -25,6 +25,7 @@ jobs:
           test -s assets/models/city-kit-commercial/building-a.glb
           test -s assets/models/mini-characters/character-male-a.glb
           test -s assets/models/car-kit/taxi.glb
+          test -s assets/models/animated-npc/CesiumMan.glb
 
       - name: Restore Android export SDK and templates
         shell: bash
@@ -58,13 +59,13 @@ jobs:
         run: |
           set -eu
           mkdir -p build
-          godot --headless --path . --export-debug Android build/From-Zero-3D-art-pass-debug.apk
-          test -s build/From-Zero-3D-art-pass-debug.apk
+          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.5-debug.apk
+          test -s build/From-Zero-3D-v0.5-debug.apk
 
       - name: Publish internal APK
         uses: actions/upload-artifact@v4
         with:
-          name: From-Zero-3D-ArtPass-Android-debug
-          path: build/From-Zero-3D-art-pass-debug.apk
+          name: From-Zero-3D-v05-Android-debug
+          path: build/From-Zero-3D-v0.5-debug.apk
           if-no-files-found: error
           retention-days: 14

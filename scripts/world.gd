@@ -17,14 +17,17 @@ var walkers: Array[Dictionary] = []
 var city_sun: DirectionalLight3D
 var city_environment: WorldEnvironment
 var elapsed := 0.0
+var fancy_materials: Dictionary = {}
 
 func _ready() -> void:
     setup_materials()
     setup_atmosphere()
     create_streets()
     make_district()
+    add_street_architecture()
     add_street_details()
     spawn_city_life()
+    spawn_animated_people()
 
 func surface(hex_value: String, rough: float = 0.94) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
@@ -41,6 +44,23 @@ func setup_materials() -> void:
         "line": surface("e9dfc5"),
         "accent": surface("f5b85c"),
     }
+    fancy_materials = {
+        "plaster_cream": surface("d8c8ab",0.89),
+        "plaster_sand": surface("a9aa96",0.9),
+        "plaster_rust": surface("bb8466",0.91),
+        "concrete": surface("b1aba1",0.9),
+        "dark_frame": surface("29363b",0.46),
+        "aluminum": surface("536672",0.35),
+        "glass": surface("244254",0.17),
+        "warm_window": surface("c6a46d",0.24),
+        "wood": surface("785038",0.78),
+        "gold": surface("d6a65f",0.52),
+        "brick": surface("8d6553",0.94),
+        "shutter": surface("6a7776",0.72),
+        "tile": surface("a3a99f",0.86),
+    }
+    (fancy_materials["glass"] as StandardMaterial3D).metallic=0.31
+    (fancy_materials["aluminum"] as StandardMaterial3D).metallic=0.46
     for key in ["ground", "asphalt", "pavement"]:
         var img := Image.create_empty(96, 96, false, Image.FORMAT_RGBA8)
         var rng := RandomNumberGenerator.new()
@@ -130,18 +150,18 @@ func setup_atmosphere() -> void:
     var environment := Environment.new()
     var sky := Sky.new()
     var procedural := ProceduralSkyMaterial.new()
-    procedural.sky_top_color = Color("6794bd")
-    procedural.sky_horizon_color = Color("eecba8")
+    procedural.sky_top_color = Color("638ca9")
+    procedural.sky_horizon_color = Color("e4c6a4")
     procedural.ground_horizon_color = Color("adb6aa")
     sky.sky_material = procedural
     environment.background_mode = Environment.BG_SKY
     environment.sky = sky
     environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
     environment.reflected_light_source = Environment.REFLECTION_SOURCE_BG
-    environment.ambient_light_energy = 0.85
+    environment.ambient_light_energy = 0.72
     environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
     environment.fog_enabled = true
-    environment.fog_density = 0.005
+    environment.fog_density = 0.0016
     environment.fog_light_color = Color("bfc9c9")
     world_environment.environment = environment
     city_environment = world_environment
@@ -149,7 +169,7 @@ func setup_atmosphere() -> void:
     var sun := DirectionalLight3D.new()
     sun.rotation_degrees = Vector3(-47, -31, 0)
     sun.light_color = Color("ffdfb5")
-    sun.light_energy = 1.25
+    sun.light_energy = 1.15
     sun.shadow_enabled = true
     sun.directional_shadow_max_distance = 65
     city_sun = sun
@@ -235,11 +255,119 @@ func spawn_city_life() -> void:
         if i < 4:
             cars.append({"node":car_node,"start":car_node.position,"phase":float(i)*3.0,"direction":1.0 if i % 2==0 else -1.0})
     var people := ["character-male-a","character-male-b","character-male-c","character-female-a","character-female-b","character-female-c"]
-    for i in range(12):
+    for i in range(7):
         var side := -1.0 if i%2 == 0 else 1.0
         var pos := Vector3(-43+float(i%6)*16.0, 0, side * (15.0 + float(i%3)*4))
         var npc := model("mini-characters", people[i%people.size()], pos, 0.95, PI/2)
         walkers.append({"node":npc,"origin":pos,"phase":float(i)*0.83,"axis":i%2})
+
+# Architectural pass: actual commercial and residential GLB shells are given
+# authored shopfront geometry (framed glazing, shutters, upper floors, fascia,
+# balconies and clear pedestrian streets). Every visible feature is 3D.
+func add_street_architecture() -> void:
+    var frontage_labels := ["THE DEPOT", "TWENTY FOUR CAFE", "CORNER MARKET", "BUSINESS HUB"]
+    var front_tones := ["plaster_cream", "plaster_rust", "plaster_sand", "plaster_cream"]
+    for n in range(4):
+        var point: Dictionary=POINTS[n]
+        var center: Vector3=point["building"]
+        var road_sign := -1.0 if center.z < 0 else 1.0
+        var front_z := center.z - road_sign * 6.4
+        create_shop_front(center.x,front_z,road_sign,frontage_labels[n],front_tones[n],n)
+    for i in range(10):
+        var x: float = [-60.0,-42.0,42.0,60.0][i%4]
+        var z: float = [-59.0,-39.0,39.0,59.0][int(i/4)%4]
+        add_residential_facade(Vector3(x,0,z),i)
+    make_urban_furniture()
+
+func create_shop_front(x: float, front_z: float, side: float, title: String, wall_name: String, index: int) -> void:
+    var wall: Material=fancy_materials[wall_name]
+    var shell := Node3D.new()
+    shell.position=Vector3(x,0,front_z)
+    add_child(shell)
+    # On-screen facade is the inhabited ground-floor base of a real GLB building.
+    box(shell,Vector3(0,4.55,0),Vector3(12.5,4.8,0.35),wall)
+    box(shell,Vector3(0,0.38,0),Vector3(12.8,0.76,0.65),fancy_materials["brick"])
+    for bay in range(-2,3):
+        var bx := float(bay)*2.27
+        box(shell,Vector3(bx,2.10,-side*0.20),Vector3(2.03,2.6,0.10),fancy_materials["dark_frame"])
+        box(shell,Vector3(bx,2.1,-side*0.265),Vector3(1.81,2.34,0.06),fancy_materials["glass"])
+        box(shell,Vector3(bx,2.03,-side*0.307),Vector3(0.045,2.30,0.036),fancy_materials["aluminum"])
+        box(shell,Vector3(bx,2.78,-side*0.310),Vector3(1.82,0.05,0.035),fancy_materials["aluminum"])
+    box(shell,Vector3(0,3.53,-side*0.38),Vector3(12.5,0.88,0.14),fancy_materials["dark_frame"])
+    # Painted signage is a world-space 3D label; never painted on the screen HUD.
+    var sign := Label3D.new()
+    sign.text=title
+    sign.position=Vector3(0,3.56,-side*0.48)
+    sign.font_size=64
+    sign.pixel_size=0.0088
+    sign.modulate=Color("f5e0bd")
+    sign.outline_size=3
+    sign.rotation.y=PI if side < 0 else 0.0
+    shell.add_child(sign)
+    box(shell,Vector3(0,3.07,-side*1.05),Vector3(12.3,0.14,1.48),fancy_materials["gold"])
+    for f in range(2):
+        var y:=5.15+float(f)*2.1
+        box(shell,Vector3(0,y+0.85,0),Vector3(12.7,0.14,0.56),fancy_materials["concrete"])
+        for window in range(4):
+            var wx:float=(float(window)-1.5)*2.93
+            box(shell,Vector3(wx,y,-side*0.215),Vector3(1.65,1.44,0.13),fancy_materials["dark_frame"])
+            box(shell,Vector3(wx,y,-side*0.30),Vector3(1.42,1.20,0.06),fancy_materials["glass"])
+            box(shell,Vector3(wx,y,-side*0.35),Vector3(0.047,1.2,0.044),fancy_materials["aluminum"])
+            box(shell,Vector3(wx,y-0.9,-side*0.51),Vector3(2.2,0.1,0.55),fancy_materials["concrete"])
+    box(shell,Vector3(0,7.67,0),Vector3(13.1,0.2,0.8),fancy_materials["plaster_cream"])
+    # Trim, lamp, and door-specific street furniture.
+    for col in [-5.9,5.9]:
+        box(shell,Vector3(col,2.26,-side*0.54),Vector3(0.19,3.9,0.3),fancy_materials["aluminum"])
+    if index%2==0:
+        box(shell,Vector3(4.35,0.84,-side*1.25),Vector3(1.2,1.35,0.65),fancy_materials["wood"])
+
+func add_residential_facade(center: Vector3, number: int) -> void:
+    # Frontal balconies break the repetitive white-box silhouette of the asset pack.
+    var side := -1.0 if center.z < 0 else 1.0
+    var front := center.z-side*6.1
+    var wall_material: Material=fancy_materials[["plaster_sand","plaster_cream","plaster_rust"][number%3]]
+    box(self,Vector3(center.x,4.5,front),Vector3(9.65,8.1,0.38),wall_material)
+    for level in range(3):
+        var y:=1.8+float(level)*2.15
+        for w in [-2.45,2.45]:
+            box(self,Vector3(center.x+w,y,front-side*0.24),Vector3(1.63,1.6,0.11),fancy_materials["dark_frame"])
+            box(self,Vector3(center.x+w,y,front-side*0.32),Vector3(1.41,1.37,0.07),fancy_materials["glass"])
+            box(self,Vector3(center.x+w,y,front-side*0.36),Vector3(0.06,1.35,0.07),fancy_materials["aluminum"])
+        box(self,Vector3(center.x,y-1.04,front-side*0.77),Vector3(8.5,0.16,1.05),fancy_materials["concrete"])
+        for j in range(9):
+            var bx:=center.x-3.9+float(j)*0.97
+            box(self,Vector3(bx,y-0.69,front-side*1.25),Vector3(0.06,0.55,0.06),fancy_materials["dark_frame"])
+        box(self,Vector3(center.x,y-0.42,front-side*1.25),Vector3(8.4,0.07,0.07),fancy_materials["dark_frame"])
+
+func make_urban_furniture() -> void:
+    # Pedestrian zebra crossings, diagonal parking bays, median strips.
+    for road_side in [-1.0,1.0]:
+        for index in range(9):
+            var mark:=float(index-4)*1.35
+            box(self,Vector3(mark,0.042,road_side*11.7),Vector3(0.78,0.018,4.1),palette["line"])
+            box(self,Vector3(road_side*11.7,0.043,mark),Vector3(4.1,0.018,0.78),palette["line"])
+    for i in range(18):
+        var side:float= -1.0 if i%2==0 else 1.0
+        var z:= -55.0+float(int(i/2))*12.0
+        box(self,Vector3(side*8.2,0.05,z),Vector3(0.17,0.12,6.0),fancy_materials["concrete"])
+    for i in range(9):
+        var x:float=-54.0+float(i)*13.6
+        box(self,Vector3(x,0.055,7.35),Vector3(6.0,0.018,0.14),palette["line"])
+
+func spawn_animated_people() -> void:
+    # Licensed, skinned glTF NPC. Its authored glTF animation actually plays.
+    # Cesium Man is CC-BY 4.0 and documented in assets/ATTRIBUTIONS.md.
+    for i in range(3):
+        var pos := Vector3(-15.0+float(i)*14.0,0.0, -13.2 if i%2==0 else 13.2)
+        var npc:=model("animated-npc","CesiumMan",pos,0.75,PI*0.5)
+        var players:=npc.find_children("*","AnimationPlayer",true,false)
+        if not players.is_empty():
+            var animator:=players[0] as AnimationPlayer
+            var clips:=animator.get_animation_list()
+            if not clips.is_empty():
+                animator.play(clips[0])
+                animator.speed_scale=0.8+0.12*float(i)
+        walkers.append({"node":npc,"origin":pos,"phase":float(i)*2.2,"axis":i%2})
 
 func configure_graphics(high_quality: bool) -> void:
     if city_sun: city_sun.shadow_enabled = high_quality

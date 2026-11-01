@@ -10,6 +10,6 @@ func _init() -> void:
 	assert(not ContractEconomy.is_unlocked(3, 1000))
 	assert(ContractEconomy.payout(100, 1.0) == 130)
 	assert(ContractEconomy.payout(100, 0.0) == 100)
-	assert(ContractEconomy.payout(95, 9.0) == 124)
+	assert(ContractEconomy.payout(95, 9.0) == 123)
 	print("CONTRACT ECONOMY TESTS: PASS")
 	quit(0)

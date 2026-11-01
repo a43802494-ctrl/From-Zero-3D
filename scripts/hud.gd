@@ -7,6 +7,7 @@ signal interact_pressed
 signal run_changed(enabled: bool)
 signal touch_moved(direction: Vector2)
 signal pause_pressed
+signal jump_pressed
 signal contract_selected(tier: int)
 signal contract_board_closed
 
@@ -38,6 +39,17 @@ var hud_bottom: Panel
 var hud_prompt: Panel
 var hud_pause_button: Button
 var hud_crosshair: Label
+var jump_button: Button
+var startup_title: Label
+var startup_subtitle: Label
+var startup_kicker: Label
+var startup_footer: Label
+var startup_play: Button
+var startup_settings: Button
+var startup_detail: Panel
+var settings_card: PanelContainer
+var pause_center: CenterContainer
+var contract_card: PanelContainer
 var ui_layout_size := Vector2.ZERO
 var settings_screen: Control
 var startup_card: PanelContainer
@@ -102,107 +114,103 @@ func make_button(title: String, where: Control, at: Vector2, extent: Vector2, pr
     b.custom_minimum_size = extent
     b.focus_mode = Control.FOCUS_NONE
     b.add_theme_font_size_override("font_size", 22)
-    b.add_theme_color_override("font_color", Color("122331") if primary else Color("f4f3ec"))
-    b.add_theme_stylebox_override("normal", style(Color("f6bb65") if primary else Color("284258"), Color("fee0aa") if primary else Color("547082"), 14, 2))
-    b.add_theme_stylebox_override("hover", style(Color("ffce81") if primary else Color("39546a"), Color("ffe2b7"), 14, 2))
-    b.add_theme_stylebox_override("pressed", style(Color("d99a48") if primary else Color("182c3d"), Color("ffe2b7"), 14, 2))
+    b.add_theme_color_override("font_color", Color("12212b") if primary else Color("f2f7f7"))
+    b.add_theme_stylebox_override("normal", style(Color("e8ac59") if primary else Color("203443"), Color("fce6bd") if primary else Color("537082"), 13, 1))
+    b.add_theme_stylebox_override("hover", style(Color("ffd08b") if primary else Color("354d60"), Color("ffe9c3"), 13, 2))
+    b.add_theme_stylebox_override("pressed", style(Color("c98c3e") if primary else Color("182c3d"), Color("fff2db"), 13, 2))
+    b.add_theme_stylebox_override("disabled", style(Color("33414b",0.7), Color("67727a",0.3), 13, 1))
+    b.add_theme_color_override("font_disabled_color", Color("a3b1b9"))
     where.add_child(b)
     return b
 
 func create_game_ui() -> void:
-    var top := panel(root, Control.PRESET_TOP_LEFT, Vector2(21, 18), Vector2(342, 96), Color(0.055, 0.102, 0.154, 0.89), Color("546f80"))
+    var top := panel(root, Control.PRESET_TOP_LEFT, Vector2.ZERO, Vector2(264, 78), Color(0.023,0.052,0.080,0.90),Color("50717e"))
     hud_top = top
-    label("FROM ZERO  /  RISE CITY", 18, Color("f4b967"), top, Vector2(20, 10), Vector2(304, 25))
-    money_label = label("120 EGP", 31, Color("fff8e9"), top, Vector2(19, 42), Vector2(230, 40))
-    rep_label = label("REP 0", 17, Color("9ddacc"), top, Vector2(232, 45), Vector2(96, 32), HORIZONTAL_ALIGNMENT_RIGHT)
-    var mission := panel(root, Control.PRESET_TOP_RIGHT, Vector2(-429, 18), Vector2(409, 129), Color(0.055, 0.102, 0.154, 0.89), Color("546f80"))
+    label("BALANCE   /   EGP", 13, Color("d9ab68"), top, Vector2(17,7), Vector2(232,21))
+    money_label = label("120",29,Color("fff8e6"),top,Vector2(16,28),Vector2(175,40))
+    rep_label = label("REP 0",14,Color("92d6c4"),top,Vector2(158,37),Vector2(95,23),HORIZONTAL_ALIGNMENT_RIGHT)
+    var mission := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(420,99),Color(0.020,0.052,0.074,0.86),Color("4d7180"))
     hud_mission = mission
-    label("YOUR NEXT MOVE", 17, Color("f4b967"), mission, Vector2(16, 7), Vector2(377, 24))
-    objective_label = label("Find the delivery depot", 20, Color("f5f4eb"), mission, Vector2(16, 33), Vector2(377, 39))
-    distance_label = label("", 16, Color("98d8d4"), mission, Vector2(16, 72), Vector2(377, 21))
-    contract_countdown = label("", 16, Color("f6bb65"), mission, Vector2(16, 99), Vector2(377, 23))
+    label("CURRENT OBJECTIVE",13,Color("f2b86d"),mission,Vector2(15,7),Vector2(386,24))
+    objective_label = label("Find the delivery depot",18,Color("f8f8ee"),mission,Vector2(15,30),Vector2(388,31))
+    distance_label = label("",14,Color("9ed4cc"),mission,Vector2(15,60),Vector2(95,27))
+    contract_countdown = label("",13,Color("efcc92"),mission,Vector2(109,59),Vector2(290,27),HORIZONTAL_ALIGNMENT_RIGHT)
     radar = CityRadar.new()
-    radar.set_anchors_preset(Control.PRESET_CENTER_TOP)
-    radar.position = Vector2(-78, 17)
-    radar.size = Vector2(156, 156)
     root.add_child(radar)
-    var bottom := panel(root, Control.PRESET_BOTTOM_LEFT, Vector2(22, -79), Vector2(260, 53), Color(0.055, 0.102, 0.154, 0.78))
+    radar.size = Vector2(120,120)
+    var bottom := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(183,42),Color(0.023,0.053,0.076,0.78))
     hud_bottom = bottom
-    stamina_label = label("ENERGY  100%", 19, Color("b8e8d5"), bottom, Vector2(16, 6), Vector2(233, 40))
-    var cross := label("+", 26, Color("ffffff"), root, Vector2(-13, -15), Vector2(26, 30), HORIZONTAL_ALIGNMENT_CENTER)
-    hud_crosshair = cross
-    cross.set_anchors_preset(Control.PRESET_CENTER)
-    var prompt := panel(root, Control.PRESET_BOTTOM_RIGHT, Vector2(-425, -96), Vector2(390, 60), Color(0.055, 0.102, 0.154, 0.73), Color("43657a"))
+    stamina_label = label("ENERGY   100%",16,Color("b9e6d7"),bottom,Vector2(12,3),Vector2(170,35))
+    hud_crosshair = label("·",27,Color("ffffff"),root,Vector2.ZERO,Vector2(28,28),HORIZONTAL_ALIGNMENT_CENTER)
+    var prompt := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(320,49),Color(0.025,0.065,0.087,0.78),Color("3f6c77"))
     hud_prompt = prompt
-    contextual_label = label("Explore the city", 18, Color("f7eddc"), prompt, Vector2(15, 8), Vector2(360, 41), HORIZONTAL_ALIGNMENT_RIGHT)
-    toast_label = label("", 21, Color("fff4dc"), root, Vector2(-250, 142), Vector2(500, 52), HORIZONTAL_ALIGNMENT_CENTER)
-    toast_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-    toast_label.position = Vector2(-250, 142)
+    contextual_label = label("Explore the city",15,Color("f5eddf"),prompt,Vector2(11,4),Vector2(295,40),HORIZONTAL_ALIGNMENT_CENTER)
+    toast_label = label("",19,Color("ffeac8"),root,Vector2.ZERO,Vector2(550,44),HORIZONTAL_ALIGNMENT_CENTER)
     toast_label.visible = false
-    var pause_btn := make_button("II", root, Vector2(0, 0), Vector2(55, 49))
-    pause_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    pause_btn.position = Vector2(-486, 137)
-    hud_pause_button = pause_btn
-    pause_btn.pressed.connect(func() -> void: pause_pressed.emit())
+    hud_pause_button = make_button("Ⅱ",root,Vector2.ZERO,Vector2(54,52))
+    hud_pause_button.pressed.connect(func()->void: pause_pressed.emit())
     if is_mobile:
-        stick = MobileStick.new()
+        stick=MobileStick.new()
         root.add_child(stick)
-        stick.size = Vector2(190, 190)
-        stick.moved.connect(func(v: Vector2) -> void: touch_moved.emit(v))
-        action_button = make_button("USE", root, Vector2(0, 0), Vector2(105, 73), true)
-        action_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-        action_button.position = Vector2(-142, -193)
-        action_button.pressed.connect(func() -> void: interact_pressed.emit())
-        run_button = make_button("RUN", root, Vector2(0, 0), Vector2(100, 59))
-        run_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-        run_button.position = Vector2(-258, -184)
-        run_button.pressed.connect(_toggle_run)
-        action_button.disabled = true
+        stick.size=Vector2(172,172)
+        stick.moved.connect(func(v: Vector2)->void: touch_moved.emit(v))
+        action_button = make_button("USE",root,Vector2.ZERO,Vector2(102,74),true)
+        action_button.pressed.connect(func()->void: interact_pressed.emit())
+        action_button.disabled=true
+        run_button = make_button("RUN",root,Vector2.ZERO,Vector2(92,62))
+        run_button.button_down.connect(func()->void: run_changed.emit(true))
+        run_button.button_up.connect(func()->void: run_changed.emit(false))
+        jump_button = make_button("JUMP",root,Vector2.ZERO,Vector2(89,52))
+        jump_button.pressed.connect(func()->void: jump_pressed.emit())
     else:
-        var control_hint := label("WASD: MOVE    MOUSE: LOOK    E: USE    SHIFT: RUN", 14, Color("b9d8dd"), root, Vector2(-385, -20), Vector2(770, 22), HORIZONTAL_ALIGNMENT_CENTER)
-        control_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+        var hint := label("WASD MOVE     •     MOUSE LOOK     •     SHIFT SPRINT     •     E INTERACT",14,Color("bdd4db"),root,Vector2.ZERO,Vector2(680,26),HORIZONTAL_ALIGNMENT_CENTER)
+        hint.name="DesktopHint"
 
 func _process(_delta: float) -> void:
-    var current_size := root.size
-    if current_size.x > 400 and current_size.y > 200 and current_size != ui_layout_size:
+    if root == null: return
+    var now := get_viewport().get_visible_rect().size
+    if now.x > 400 and now.y > 200 and (now-ui_layout_size).length() > 1.0:
         update_hud_layout()
 
 func place_control(control: Control, xy: Vector2, dimensions: Vector2) -> void:
-    # Top-left anchors + pixel offsets are reliable on Android wide screens.
-    # Negative positions set before parenting caused all controls to leave the screen.
-    control.anchor_left = 0.0
-    control.anchor_right = 0.0
-    control.anchor_top = 0.0
-    control.anchor_bottom = 0.0
-    control.offset_left = xy.x
-    control.offset_top = xy.y
-    control.offset_right = xy.x + dimensions.x
-    control.offset_bottom = xy.y + dimensions.y
+    control.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    control.offset_left=xy.x
+    control.offset_top=xy.y
+    control.offset_right=xy.x+dimensions.x
+    control.offset_bottom=xy.y+dimensions.y
 
 func update_hud_layout() -> void:
     if root == null: return
-    var v := root.size
-    if v.x < 400 or v.y < 200:
-        v = get_viewport().get_visible_rect().size
+    var v := get_viewport().get_visible_rect().size
     if v.x < 400 or v.y < 200: return
-    ui_layout_size = v
-    var ui_scale := clampf(v.y / 720.0, 0.8, 1.5)
-    place_control(hud_top, Vector2(20, 20), Vector2(342, 96))
-    place_control(hud_mission, Vector2(v.x - 429, 20), Vector2(409, 129))
-    place_control(radar, Vector2(v.x * 0.5 - 78, 20), Vector2(156, 156))
-    place_control(hud_bottom, Vector2(20, v.y - 80), Vector2(260, 53))
-    place_control(hud_prompt, Vector2(v.x - 425, v.y - 102), Vector2(390, 60))
-    place_control(hud_crosshair, v * 0.5 - Vector2(13, 15), Vector2(26, 30))
-    place_control(toast_label, Vector2(v.x * 0.5 - 250, 184), Vector2(500, 52))
-    place_control(hud_pause_button, Vector2(v.x - 74, 162), Vector2(54, 49))
+    ui_layout_size=v
+    var k: float = clampf(v.y/720.0,0.65,1.50)
+    var margin: float = maxf(14.0, v.x*0.014)
+    place_control(hud_top,Vector2(margin,margin),Vector2(264,78)*k)
+    place_control(hud_mission,Vector2(v.x - 420*k - margin,margin),Vector2(420,99)*k)
+    place_control(radar,Vector2(v.x-134*k-margin,121*k),Vector2(120,120)*k)
+    place_control(hud_bottom,Vector2(margin,v.y - 53*k - margin),Vector2(183,42)*k)
+    place_control(hud_prompt,Vector2(v.x-334*k-margin,v.y-62*k-margin),Vector2(320,49)*k)
+    place_control(hud_crosshair,Vector2(v.x/2-14*k,v.y/2-14*k),Vector2(28,28)*k)
+    place_control(toast_label,Vector2(v.x/2 - 275*k,135*k),Vector2(550,44)*k)
+    place_control(hud_pause_button,Vector2(v.x-75*k-margin,255*k),Vector2(54,52)*k)
     if is_mobile:
-        # Distinct left-thumb move and right-thumb action areas.
-        var stick_side := 184.0 * ui_scale
-        place_control(stick, Vector2(36, v.y - stick_side - 48), Vector2(stick_side, stick_side))
-        place_control(action_button, Vector2(v.x - 160, v.y - 215), Vector2(130, 80))
-        place_control(run_button, Vector2(v.x - 297, v.y - 200), Vector2(112, 70))
-        # Gameplay text remains visible; unlike earlier builds, the action buttons
-        # are not positioned using negative screen-space offsets.
+        var joystick_diameter: float=170*k
+        place_control(stick,Vector2(margin+12*k,v.y-joystick_diameter-28*k),Vector2.ONE*joystick_diameter)
+        place_control(action_button,Vector2(v.x-128*k-margin,v.y-194*k),Vector2(108,72)*k)
+        place_control(run_button,Vector2(v.x-244*k-margin,v.y-154*k),Vector2(98,60)*k)
+        place_control(jump_button,Vector2(v.x-127*k-margin,v.y-114*k),Vector2(108,54)*k)
+        # The joystick follows all size changes: its center must not remain at the old coordinates.
+        if stick.active_index < 0:
+            stick.center_position=stick.global_position+stick.size*0.5
+    else:
+        var hint := root.get_node_or_null("DesktopHint") as Control
+        if hint: place_control(hint,Vector2(v.x*0.5-340*k,v.y-34*k),Vector2(680,26)*k)
+    layout_main_menu(v,k,margin)
+    if settings_card:
+        settings_card.custom_minimum_size=Vector2(minf(v.x-32,570*k),minf(v.y-28,466*k))
+    if contract_card:
+        contract_card.custom_minimum_size=Vector2(minf(v.x-30,695*k),minf(v.y-20,520*k))
 
 func _toggle_run() -> void:
     running = not running
@@ -246,73 +254,49 @@ func toast(message: String) -> void:
     )
 
 func create_startup() -> void:
-    startup = Control.new()
-    startup.mouse_filter = Control.MOUSE_FILTER_STOP
+    startup=Control.new()
+    startup.mouse_filter=Control.MOUSE_FILTER_STOP
     root.add_child(startup)
     startup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    # Underlying 3D city remains visible as a cinematic background.
-    var wash := ColorRect.new()
-    wash.color = Color(0.014, 0.031, 0.048, 0.62)
-    startup.add_child(wash)
-    wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    var edge := ColorRect.new()
-    edge.color = Color("f3bb67")
-    edge.anchor_bottom = 1.0
-    edge.offset_right = 9.0
-    startup.add_child(edge)
-    var center := CenterContainer.new()
-    startup.add_child(center)
-    center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    startup_card = PanelContainer.new()
-    startup_card.custom_minimum_size = Vector2(570, 510)
-    startup_card.add_theme_stylebox_override("panel", style(Color(0.025, 0.061, 0.092, 0.90), Color("d6ae76"), 24, 2))
-    center.add_child(startup_card)
-    var margin := MarginContainer.new()
-    for side in ["left","right"]: margin.add_theme_constant_override("margin_"+side, 42)
-    for side in ["top","bottom"]: margin.add_theme_constant_override("margin_"+side, 25)
-    startup_card.add_child(margin)
-    var content := VBoxContainer.new()
-    content.add_theme_constant_override("separation", 12)
-    margin.add_child(content)
-    var kicker := Label.new()
-    kicker.text = "CHAPTER 01   /   THE FIRST HUNDRED"
-    kicker.add_theme_font_size_override("font_size", 18)
-    kicker.add_theme_color_override("font_color", Color("f6bd69"))
-    content.add_child(kicker)
-    var name_label := Label.new()
-    name_label.text = "FROM ZERO"
-    name_label.add_theme_font_size_override("font_size", 65)
-    name_label.add_theme_color_override("font_color", Color("fff5e5"))
-    content.add_child(name_label)
-    var chapter := Label.new()
-    chapter.text = "RISE CITY    •    A FIRST-PERSON LIFE SIM"
-    chapter.add_theme_font_size_override("font_size", 20)
-    chapter.add_theme_color_override("font_color", Color("b6d4d7"))
-    content.add_child(chapter)
-    var line := HSeparator.new()
-    content.add_child(line)
-    var story := Label.new()
-    story.text = "120 EGP. No shortcuts. One city full of chances.\nTake contracts, build your reputation and own your future."
-    story.add_theme_font_size_override("font_size", 18)
-    story.add_theme_color_override("font_color", Color("d9e3e0"))
-    content.add_child(story)
-    var spacer := Control.new()
-    spacer.custom_minimum_size = Vector2(1,12)
-    content.add_child(spacer)
-    var btn_play := make_button("▶   PLAY", content, Vector2.ZERO, Vector2(465,70), true)
-    btn_play.add_theme_font_size_override("font_size", 30)
-    btn_play.pressed.connect(func() -> void:
-        startup.visible = false
+    # Real-time city remains visible behind a two-tone cinematic scrim.
+    var dark := ColorRect.new()
+    dark.color=Color(0.012,0.029,0.043,0.81)
+    startup.add_child(dark)
+    dark.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    var strip := ColorRect.new()
+    strip.color=Color("edb267")
+    strip.name="AccentBar"
+    startup.add_child(strip)
+    startup_detail = panel(startup,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(500,570),Color(0.025,0.062,0.082,0.45))
+    startup_detail.add_theme_stylebox_override("panel",style(Color(0.035,0.075,0.095,0.4),Color.TRANSPARENT,6))
+    startup_kicker=label("CHAPTER 01     /     YOUR FIRST 120 EGP",17,Color("f2b66b"),startup,Vector2.ZERO,Vector2(640,34))
+    startup_title=label("FROM ZERO",75,Color("fff5e7"),startup,Vector2.ZERO,Vector2(730,98))
+    startup_subtitle=label("EVERY EMPIRE STARTS SOMEWHERE",20,Color("bacdd4"),startup,Vector2.ZERO,Vector2(750,46))
+    startup_play=make_button("▶     PLAY NOW",startup,Vector2.ZERO,Vector2(360,75),true)
+    startup_play.add_theme_font_size_override("font_size",28)
+    startup_play.pressed.connect(func()->void:
+        startup.visible=false
         play_pressed.emit()
     )
-    var btn_gear := make_button("⚙   SETTINGS", content, Vector2.ZERO, Vector2(465,62), false)
-    btn_gear.add_theme_font_size_override("font_size", 23)
-    btn_gear.pressed.connect(open_settings)
-    var footer := Label.new()
-    footer.text = "3D EXPLORATION   •   WORK   •   EARN   •   GROW"
-    footer.add_theme_font_size_override("font_size", 14)
-    footer.add_theme_color_override("font_color", Color("a3b1b4"))
-    content.add_child(footer)
+    startup_settings=make_button("⚙     SETTINGS",startup,Vector2.ZERO,Vector2(360,64))
+    startup_settings.pressed.connect(open_settings)
+    startup_footer=label("FIRST-PERSON  •  OPEN CITY  •  BUILD YOUR STORY",14,Color("96b2ba"),startup,Vector2.ZERO,Vector2(690,36))
+    var v := get_viewport().get_visible_rect().size
+    if v.x>400: layout_main_menu(v,clampf(v.y/720.0,0.65,1.5),maxf(14.0,v.x*0.014))
+
+func layout_main_menu(v: Vector2, k: float, margin: float) -> void:
+    if startup == null or startup_title == null: return
+    var x := margin + 52*k
+    var y := v.y*0.20
+    place_control(startup_detail,Vector2(margin+18*k,margin+20*k),Vector2(minf(v.x*0.58,720*k),v.y-(margin+20*k)*2.0))
+    var accent: Control = startup.get_node("AccentBar")
+    place_control(accent,Vector2(x,y-32*k),Vector2(70,5)*k)
+    place_control(startup_kicker,Vector2(x,y),Vector2(640,32)*k)
+    place_control(startup_title,Vector2(x,y+30*k),Vector2(minf(v.x*0.65,730*k),97*k))
+    place_control(startup_subtitle,Vector2(x,y+126*k),Vector2(minf(v.x*0.69,725*k),42*k))
+    place_control(startup_play,Vector2(x,y+208*k),Vector2(365,73)*k)
+    place_control(startup_settings,Vector2(x,y+294*k),Vector2(365,61)*k)
+    place_control(startup_footer,Vector2(x,y+381*k),Vector2(690,32)*k)
 
 func create_pause_menu() -> void:
     pause_screen = Control.new()
@@ -361,6 +345,7 @@ func create_settings_screen() -> void:
     settings_screen.add_child(center)
     center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     var card := PanelContainer.new()
+    settings_card = card
     card.custom_minimum_size = Vector2(560,425)
     card.add_theme_stylebox_override("panel", style(Color("122635"),Color("ddae65"),22,2))
     center.add_child(card)
@@ -467,6 +452,7 @@ func create_contract_board() -> void:
     center.set_anchors_preset(Control.PRESET_FULL_RECT)
     contract_panel.add_child(center)
     var card := PanelContainer.new()
+    contract_card = card
     card.custom_minimum_size = Vector2(660, 480)
     card.add_theme_stylebox_override("panel", style(Color("122a3a"), Color("6b8c96"), 24, 2))
     center.add_child(card)

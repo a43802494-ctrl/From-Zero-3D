@@ -41,6 +41,7 @@ func _ready() -> void:
 	add_child(hud)
 	hud.play_pressed.connect(start_game)
 	hud.interact_pressed.connect(interact)
+	hud.jump_pressed.connect(func() -> void: player.request_jump())
 	hud.pause_pressed.connect(toggle_pause)
 	hud.contract_selected.connect(accept_contract)
 	hud.contract_board_closed.connect(close_contract_board)
@@ -53,6 +54,14 @@ func _ready() -> void:
 	player.look_sensitivity = hud.look_sens
 	world.configure_graphics(hud.quality_high)
 	create_waypoint()
+	# Front-page uses its own aerial view; enter the body camera on Play.
+	var hero_camera := Camera3D.new()
+	hero_camera.name="MenuCamera"
+	hero_camera.position = Vector3(36,16,43)
+	hero_camera.fov = 69.0
+	add_child(hero_camera)
+	hero_camera.look_at(Vector3(0,2,0),Vector3.UP)
+	hero_camera.make_current()
 	create_audio()
 	load_progress()
 	refresh_ui()
@@ -112,6 +121,7 @@ func start_game() -> void:
 	in_game = true
 	paused = false
 	player.set_playing(true)
+	player.cam.make_current()
 	ambience.play()
 	play_effect("res://audio/reward.ogg")
 	hud.toast("Your story starts now. Find THE DEPOT and take a contract.")

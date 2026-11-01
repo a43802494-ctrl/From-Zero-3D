@@ -21,6 +21,8 @@ var held_package: Node3D
 var step_timer := 0.0
 var bob_clock := 0.0
 var footstep_player: AudioStreamPlayer
+var jump_requested := false
+var move_yaw_rate := 0.0
 
 func _ready() -> void:
 	name = "FirstPersonPlayer"
@@ -115,6 +117,9 @@ func set_playing(enabled: bool) -> void:
 func set_touch_move(value: Vector2) -> void:
 	touch_move = value
 
+func request_jump() -> void:
+    jump_requested = true
+
 func set_package(yes: bool) -> void:
 	held_package.visible = yes
 
@@ -127,8 +132,9 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventScreenTouch:
 		var view_size := get_viewport().get_visible_rect().size
 		if event.pressed and look_touch_index == -1:
-			# The lower-right buttons are for interaction, not looking around.
-			if event.position.x > view_size.x * 0.48 and not (event.position.x > view_size.x * 0.72 and event.position.y > view_size.y * 0.63):
+			# The entire left-hand region belongs to move; top-right panels + bottom
+			# button strip are reserved for UI. A second finger can look while moving.
+			if event.position.x > view_size.x * 0.46 and event.position.y > view_size.y * 0.22 and event.position.y < view_size.y * 0.76:
 				look_touch_index = event.index
 		elif not event.pressed and event.index == look_touch_index:
 			look_touch_index = -1
@@ -155,15 +161,18 @@ func _physics_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): d.x -= 1.0
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): d.x += 1.0
 	d = d.limit_length()
-	var direction := (Basis(Vector3.UP, rotation.y) * Vector3(d.x, 0.0, d.y)).normalized()
+	# Camera-relative 360-degree locomotion (diagonals have normalized speed).
+    # Screen-stick +Y is backwards and -Y is forwards, in both orientations.
+	var direction := (global_transform.basis * Vector3(d.x, 0.0, d.y)).normalized()
 	var running := run_toggle or Input.is_key_pressed(KEY_SHIFT)
 	var speed := (RUN_SPEED if running else WALK_SPEED) * (1.35 if has_scooter else 1.0) * fatigue_factor
 	velocity.x = move_toward(velocity.x, direction.x * speed, ACCELERATION * delta)
 	velocity.z = move_toward(velocity.z, direction.z * speed, ACCELERATION * delta)
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
-	elif Input.is_key_pressed(KEY_SPACE):
+	elif Input.is_key_pressed(KEY_SPACE) or jump_requested:
 		velocity.y = JUMP_VELOCITY
+	jump_requested = false
 	move_and_slide()
 	
 	var moving := d.length() > 0.1 and is_on_floor()

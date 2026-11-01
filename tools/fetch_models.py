@@ -44,7 +44,19 @@ def download():
                     if attempt == 2:
                         raise RuntimeError(f'Failed downloading {url}') from exc
                     time.sleep(2*(attempt+1))
-    print(f'CC0 models complete; fetched {count} files.')
+    # Textured, skinned and genuinely animated glTF. Creative Commons BY 4.0.
+    # Source and required attribution: assets/ATTRIBUTIONS.md.
+    cesium = ROOT / 'assets/models/animated-npc/CesiumMan.glb'
+    cesium.parent.mkdir(parents=True, exist_ok=True)
+    if not cesium.exists() or cesium.stat().st_size < 10000:
+        url='https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb'
+        req=urllib.request.Request(url,headers={'User-Agent':'FromZero-Godot-AssetFetcher/1.0'})
+        with urllib.request.urlopen(req,timeout=90) as response:
+            raw=response.read()
+        if raw[:4] != b'glTF': raise ValueError('Invalid animated glb')
+        cesium.write_bytes(raw)
+        print('Fetched animated human',len(raw))
+    print(f'3D models complete; fetched {count} files.')
 
 if __name__=='__main__':
     download()
