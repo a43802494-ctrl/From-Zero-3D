@@ -1,0 +1,27 @@
+; FROM ZERO — RISE CITY
+; Godot 4.6
+config_version=5
+
+[application]
+config/name="FROM ZERO | RISE CITY"
+run/main_scene="res://scenes/main.tscn"
+config/description="First-person 3D life and business simulator"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=0
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+anti_aliasing/quality/msaa_3d=1
+
+[physics]
+3d/default_gravity=18.0
+
+[environment]
+defaults/default_clear_color=Color(0.11, 0.18, 0.27, 1)
