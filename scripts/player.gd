@@ -118,7 +118,7 @@ func set_touch_move(value: Vector2) -> void:
 	touch_move = value
 
 func request_jump() -> void:
-    jump_requested = true
+	jump_requested = true
 
 func set_package(yes: bool) -> void:
 	held_package.visible = yes
@@ -162,7 +162,7 @@ func _physics_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): d.x += 1.0
 	d = d.limit_length()
 	# Camera-relative 360-degree locomotion (diagonals have normalized speed).
-    # Screen-stick +Y is backwards and -Y is forwards, in both orientations.
+	# Screen-stick +Y is backwards and -Y is forwards, in both orientations.
 	var direction := (global_transform.basis * Vector3(d.x, 0.0, d.y)).normalized()
 	var running := run_toggle or Input.is_key_pressed(KEY_SHIFT)
 	var speed := (RUN_SPEED if running else WALK_SPEED) * (1.35 if has_scooter else 1.0) * fatigue_factor

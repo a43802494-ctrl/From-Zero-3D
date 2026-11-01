@@ -61,6 +61,29 @@ func setup_materials() -> void:
     }
     (fancy_materials["glass"] as StandardMaterial3D).metallic=0.31
     (fancy_materials["aluminum"] as StandardMaterial3D).metallic=0.46
+    # Tiled plaster, poured-concrete and brick albedo textures. This gives the
+    # authored facades surface variation even on the GL-compatibility renderer.
+    for material_name in ["plaster_cream", "plaster_sand", "plaster_rust", "brick", "concrete", "tile"]:
+        var img2 := Image.create_empty(128, 128, false, Image.FORMAT_RGBA8)
+        var random2 := RandomNumberGenerator.new()
+        random2.seed = 100021 + material_name.hash()
+        for cy in range(128):
+            for cx in range(128):
+                var speckle: float=random2.randf_range(0.91,1.07)
+                if material_name == "brick":
+                    var course: int=int(cy/19)
+                    var stagger: int=16 if course%2==0 else 0
+                    if cy%19 < 2 or (cx+stagger)%43 < 2:
+                        speckle = 0.55
+                    else:
+                        speckle *= 1.0 + 0.04*sin(float(cx)*0.25)
+                elif material_name == "concrete" or material_name == "tile":
+                    if cx%42<2 or cy%42<2: speckle*=0.74
+                img2.set_pixel(cx,cy,Color(speckle,speckle,speckle,1))
+        var surface_mat: StandardMaterial3D=fancy_materials[material_name]
+        surface_mat.albedo_texture=ImageTexture.create_from_image(img2)
+        surface_mat.uv1_scale=Vector3(3.0,3.0,1.0)
+        surface_mat.texture_filter=BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
     for key in ["ground", "asphalt", "pavement"]:
         var img := Image.create_empty(96, 96, false, Image.FORMAT_RGBA8)
         var rng := RandomNumberGenerator.new()
