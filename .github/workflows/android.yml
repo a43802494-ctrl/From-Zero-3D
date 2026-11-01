@@ -20,11 +20,21 @@ jobs:
         run: |
           set -eu
           apt-get update -qq
-          apt-get install -y --no-install-recommends python3 ca-certificates
+          apt-get install -y --no-install-recommends python3 ca-certificates fontconfig
           python3 tools/fetch_models.py
           test -s assets/models/city-kit-commercial/building-a.glb
           test -s assets/models/mini-characters/character-male-a.glb
           test -s assets/models/car-kit/taxi.glb
+
+      - name: Restore Android export SDK and templates
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p "$HOME/.config" "$HOME/.local/share/godot/export_templates"
+          cp -a /root/.config/godot "$HOME/.config/"
+          cp -a /root/.local/share/godot/export_templates/4.6.3.stable "$HOME/.local/share/godot/export_templates/"
+          test -s "$HOME/.local/share/godot/export_templates/4.6.3.stable/android_debug.apk"
+          test -f "$HOME/.config/godot/editor_settings-4.6.tres"
 
       - name: Import project and check GDScript
         shell: bash
