@@ -18,6 +18,17 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v4
 
+      - name: Restore Godot Android SDK and export templates
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p "$HOME/.config" "$HOME/.local/share/godot/export_templates"
+          cp -a /root/.config/godot "$HOME/.config/"
+          cp -a /root/.local/share/godot/export_templates/4.6.3.stable "$HOME/.local/share/godot/export_templates/"
+          test -s "$HOME/.local/share/godot/export_templates/4.6.3.stable/android_debug.apk"
+          test -f "$HOME/.config/godot/editor_settings-4.6.tres"
+          echo "Android export SDK and templates configured."
+
       - name: Import project and validate GDScript
         shell: bash
         run: |
