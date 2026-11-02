@@ -75,7 +75,7 @@ func _ready() -> void:
     # Professional hand meshes and proper animations belong in the art pass.
 
     footstep_player = AudioStreamPlayer.new()
-    footstep_player.volume_db = -22.0
+    footstep_player.volume_db = -28.0
     footstep_player.stream = preload("res://audio/soft_step.ogg")
     add_child(footstep_player)
 
@@ -124,7 +124,7 @@ func set_playing(enabled: bool) -> void:
 
 func set_footstep_volume(level: float) -> void:
     footstep_volume = clampf(level, 0.0, 1.0)
-    footstep_player.volume_db = linear_to_db(maxf(0.0001, footstep_volume)) if footstep_volume > 0.0 else -80.0
+    footstep_player.volume_db = (-15.0 + linear_to_db(maxf(0.0001, footstep_volume))) if footstep_volume > 0.0 else -80.0
 
 func set_touch_move(value: Vector2) -> void:
     # Use a consistent dead-zone; the physics loop smooths movement independent of FPS.
