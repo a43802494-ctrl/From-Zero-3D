@@ -3,13 +3,15 @@ class_name CityPlayer
 
 const WALK_SPEED := 5.8
 const RUN_SPEED := 9.2
-const ACCELERATION := 15.0
+const ACCELERATION := 22.0
+const BRAKING := 30.0
 const JUMP_VELOCITY := 6.5
 const GRAVITY := 18.0
 const MOUSE_SENS := 0.0024
 var look_sensitivity := 1.0
 
 var touch_move := Vector2.ZERO
+var filtered_touch_move := Vector2.ZERO
 var look_touch_index := -1
 var run_toggle := false
 var control_active := false
@@ -48,11 +50,11 @@ func _ready() -> void:
 	
 	# First-person held parcel is deliberately a 3D prop, not a UI picture.
 	held_package = Node3D.new()
-	held_package.position = Vector3(0.4, -0.42, -0.73)
+	held_package.position = Vector3(0.42, -0.70, -0.86)
 	cam.add_child(held_package)
 	var box := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.35, 0.28, 0.37)
+	mesh.size = Vector3(0.24, 0.16, 0.25)
 	box.mesh = mesh
 	var paper := StandardMaterial3D.new()
 	paper.albedo_color = Color("c39c61")
@@ -61,7 +63,7 @@ func _ready() -> void:
 	held_package.add_child(box)
 	var band := MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(0.37, 0.29, 0.055)
+	bm.size = Vector3(0.25, 0.17, 0.035)
 	band.mesh = bm
 	var tape := StandardMaterial3D.new()
 	tape.albedo_color = Color("e6ca9a")
@@ -108,6 +110,7 @@ func set_playing(enabled: bool) -> void:
 	control_active = enabled
 	if not enabled:
 		touch_move = Vector2.ZERO
+		filtered_touch_move = Vector2.ZERO
 		look_touch_index = -1
 	if OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -115,7 +118,8 @@ func set_playing(enabled: bool) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if enabled else Input.MOUSE_MODE_VISIBLE
 
 func set_touch_move(value: Vector2) -> void:
-	touch_move = value
+    # Use a consistent dead-zone; the physics loop smooths movement independent of FPS.
+    touch_move = value.limit_length(1.0) if value.length() >= 0.10 else Vector2.ZERO
 
 func request_jump() -> void:
 	jump_requested = true
@@ -134,7 +138,7 @@ func _input(event: InputEvent) -> void:
 		if event.pressed and look_touch_index == -1:
 			# The entire left-hand region belongs to move; top-right panels + bottom
 			# button strip are reserved for UI. A second finger can look while moving.
-			if event.position.x > view_size.x * 0.46 and event.position.y > view_size.y * 0.22 and event.position.y < view_size.y * 0.76:
+			if event.position.x > view_size.x * 0.52 and event.position.y > view_size.y * 0.17 and event.position.y < view_size.y * 0.82 and not (event.position.x > view_size.x * 0.75 and event.position.y > view_size.y * 0.60):
 				look_touch_index = event.index
 		elif not event.pressed and event.index == look_touch_index:
 			look_touch_index = -1
@@ -155,7 +159,10 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	
-	var d := touch_move
+	# Smooth the joystick input (also on diagonals), but release quickly.
+	var response: float = BRAKING if touch_move.length() < 0.10 else ACCELERATION
+	filtered_touch_move = filtered_touch_move.move_toward(touch_move, response * delta * 0.32)
+	var d := filtered_touch_move
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): d.y -= 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): d.y += 1.0
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): d.x -= 1.0
@@ -163,7 +170,7 @@ func _physics_process(delta: float) -> void:
 	d = d.limit_length()
 	# Camera-relative 360-degree locomotion (diagonals have normalized speed).
 	# Screen-stick +Y is backwards and -Y is forwards, in both orientations.
-	var direction := (global_transform.basis * Vector3(d.x, 0.0, d.y)).normalized()
+	var direction := (global_transform.basis * Vector3(d.x, 0.0, d.y)).limit_length()
 	var running := run_toggle or Input.is_key_pressed(KEY_SHIFT)
 	var speed := (RUN_SPEED if running else WALK_SPEED) * (1.35 if has_scooter else 1.0) * fatigue_factor
 	velocity.x = move_toward(velocity.x, direction.x * speed, ACCELERATION * delta)
@@ -188,4 +195,4 @@ func _physics_process(delta: float) -> void:
 		cam.position.y = move_toward(cam.position.y, 0.0, delta * 0.18)
 		step_timer = 0.04
 	if held_package.visible:
-		held_package.position.y = -0.42 + sin(bob_clock) * 0.012
+		held_package.position.y = -0.70 + sin(bob_clock) * 0.012

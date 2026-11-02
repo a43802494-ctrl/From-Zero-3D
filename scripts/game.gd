@@ -109,8 +109,11 @@ func create_waypoint() -> void:
 	beam.material_override = glow
 	waypoint.add_child(beam)
 	waypoint_label = Label3D.new()
-	waypoint_label.text = "OBJECTIVE"
+	waypoint_label.text = "الهدف"
 	waypoint_label.font_size = 50
+    var label_font := SystemFont.new()
+    label_font.font_names = PackedStringArray(["Noto Naskh Arabic", "Noto Sans Arabic", "sans-serif"])
+    waypoint_label.font=label_font
 	waypoint_label.pixel_size = 0.007
 	waypoint_label.position.y = 0.85
 	waypoint_label.modulate = Color("ffe6b7")
@@ -124,7 +127,7 @@ func start_game() -> void:
 	player.cam.make_current()
 	ambience.play()
 	play_effect("res://audio/reward.ogg")
-	hud.toast("Your story starts now. Find THE DEPOT and take a contract.")
+	hud.toast("الحكاية بدأت! روح مكتب الشحن وخد أول شغلانة.")
 
 func toggle_pause() -> void:
 	if not in_game: return
@@ -156,12 +159,12 @@ func get_point(id: String) -> Dictionary:
 
 func current_objective() -> String:
 	if package_active:
-		return "Deliver your parcel to " + get_point(destination_id)["title"]
+		return "وصل الطلب لـ " + get_point(destination_id)["title"]
 	if deliveries == 0:
-		return "Get your first job at THE DEPOT"
+		return "ابدأ أول شغلانة من مكتب الشحن"
 	if business_owned:
-		return "Own your future. Keep earning!"
-	return "Return to THE DEPOT for more work"
+		return "مشروعك اشتغل! كمّل ووسّع تجارتك"
+	return "ارجع مكتب الشحن وخد شغلانة جديدة"
 
 func _process(delta: float) -> void:
 	if not in_game or paused or contract_board_open: return
@@ -175,7 +178,7 @@ func _process(delta: float) -> void:
 			best_dist = dist
 			near = p["id"]
 	current_poi = near
-	var context_text := "Find work. Build your future."
+	var context_text := "دور على شغل وابني مستقبلك"
 	if near != "": context_text = interaction_text(near)
 	hud.update_interaction(context_text, near != "")
 	
@@ -205,7 +208,7 @@ func _process(delta: float) -> void:
 			cash += 35
 			reputation += 1
 			save_progress()
-			hud.toast("Your business earned +35 EGP!")
+			hud.toast("مشروعك كسب ٣٥ جنيه!")
 			play_effect("res://audio/reward.ogg")
 	save_clock += delta
 	if save_clock > 12.0:
@@ -216,24 +219,24 @@ func _process(delta: float) -> void:
 func interaction_text(id: String) -> String:
 	match id:
 		"depot":
-			return "THE DEPOT · Parcel already loaded" if package_active else "THE DEPOT · Browse delivery contracts"
+			return "مكتب الشحن: معاك طلبية دلوقتي" if package_active else "مكتب الشحن: اختار شغلانة"
 		"cafe":
-			if package_active and destination_id == id: return "CAFE · Drop off parcel"
-			return "CAFE · Meal +35 energy / 25 EGP"
+			if package_active and destination_id == id: return "القهوة: سلّم الطلب"
+			return "القهوة: وجبة بـ٢٥ جنيه تزود طاقتك"
 		"market":
-			if package_active and destination_id == id: return "MARKET · Drop off parcel"
-			return "MARKET · Faster movement / 400 EGP" if not scooter_owned else "MARKET · Upgrade already owned"
+			if package_active and destination_id == id: return "السوبر ماركت: سلّم الطلب"
+			return "السوبر ماركت: سرعة أعلى بـ٤٠٠ جنيه" if not scooter_owned else "السوبر ماركت: التطوير معاك بالفعل"
 		"agency":
-			if package_active and destination_id == id: return "BUSINESS HUB · Drop off parcel"
-			return "BUSINESS HUB · Open business / 900 EGP" if not business_owned else "BUSINESS HUB · Your business is operating"
-	return "Explore"
+			if package_active and destination_id == id: return "مكتب المشاريع: سلّم الطلب"
+			return "مكتب المشاريع: افتح مشروع بـ٩٠٠ جنيه" if not business_owned else "مكتب المشاريع: مشروعك شغّال"
+	return "اتفرج على المدينة"
 
 func interact() -> void:
 	if not in_game or paused or contract_board_open or current_poi == "": return
 	match current_poi:
 		"depot":
 			if package_active:
-				hud.toast("First, deliver your parcel!")
+				hud.toast("سلّم الطلب اللي معاك الأول!")
 				play_effect("res://audio/nope.ogg")
 			else:
 				contract_board_open = true
@@ -246,29 +249,29 @@ func interact() -> void:
 				if cash >= 25:
 					cash -= 25
 					energy = minf(100.0, energy + 35.0)
-					hud.toast("Good meal! Energy restored.")
+					hud.toast("بالهنا! طاقتك رجعت.")
 					play_effect("res://audio/buy.ogg")
 					save_progress()
 				else: cannot_afford()
 			elif current_poi == "market":
 				if scooter_owned:
-					hud.toast("Speed upgrade already unlocked")
+					hud.toast("إنت اشتريت تطوير السرعة قبل كده")
 				elif cash >= 400:
 					cash -= 400
 					scooter_owned = true
 					player.has_scooter = true
-					hud.toast("FAST TRAVEL UPGRADE! Movement +35%")
+					hud.toast("عاش! بقيت أسرع ٣٥٪")
 					play_effect("res://audio/reward.ogg")
 					save_progress()
 				else: cannot_afford()
 			elif current_poi == "agency":
 				if business_owned:
-					hud.toast("Your business is already earning for you!")
+					hud.toast("مشروعك شغّال وبيكسبك!")
 				elif cash >= 900:
 					cash -= 900
 					business_owned = true
 					reputation += 35
-					hud.toast("MILESTONE! Your first business is now open!")
+					hud.toast("مبروك! فتحت أول مشروع ليك!")
 					play_effect("res://audio/reward.ogg")
 					save_progress()
 				else: cannot_afford()
@@ -290,12 +293,12 @@ func accept_contract(tier: int) -> void:
 	package_active = true
 	player.set_package(true)
 	close_contract_board()
-	hud.toast("CONTRACT ACCEPTED! Follow the beacon to " + get_point(destination_id)["title"])
+	hud.toast("استلمت الطلب! امشي ناحية العلامة وروح " + get_point(destination_id)["title"])
 	play_effect("res://audio/reward.ogg")
 	save_progress()
 
 func cannot_afford() -> void:
-	hud.toast("Not enough EGP. Make more deliveries!")
+	hud.toast("فلوسك مش مكفية، اعمل توصيلات أكتر!")
 	play_effect("res://audio/nope.ogg")
 
 func complete_delivery() -> void:
@@ -305,7 +308,7 @@ func complete_delivery() -> void:
 	deliveries += 1
 	package_active = false
 	player.set_package(false)
-	hud.toast("CONTRACT COMPLETE! +%d EGP  •  +10 REP" % reward)
+	hud.toast("وصلت الطلب! +%d جنيه و+١٠ سمعة" % reward)
 	play_effect("res://audio/reward.ogg")
 	save_progress()
 

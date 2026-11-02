@@ -7,6 +7,10 @@ config/name="FROM ZERO | RISE CITY"
 run/main_scene="res://scenes/main.tscn"
 config/description="First-person 3D life and business simulator"
 
+[internationalization]
+locale/fallback="ar"
+rendering/root_node_layout_direction=1
+
 [display]
 window/size/viewport_width=1280
 window/size/viewport_height=720

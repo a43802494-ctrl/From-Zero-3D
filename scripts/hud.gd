@@ -63,6 +63,14 @@ func _ready() -> void:
     is_mobile = OS.has_feature("mobile") or OS.get_environment("FROMZERO_TEST_MOBILE") == "1"
     root = Control.new()
     root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    # The OS may use Arabic RTL locale. Pin gamepad controls physically left/right.
+    # In previous APK, automatic mirroring pushed the joystick to the RIGHT.
+    root.layout_direction = Control.LAYOUT_DIRECTION_LTR
+    var ui_font := SystemFont.new()
+    ui_font.font_names = PackedStringArray(["Noto Naskh Arabic", "Noto Sans Arabic", "sans-serif"])
+    var ui_theme := Theme.new()
+    ui_theme.default_font = ui_font
+    root.theme = ui_theme
     add_child(root)
     # Apply the full-rect anchors only AFTER parenting the control.
     root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -72,6 +80,10 @@ func _ready() -> void:
     create_contract_board()
     create_settings_screen()
     load_settings()
+    # Force all HUD children to inherit a fixed coordinate system regardless of
+    # system locale; Arabic text is still shaped RTL by Godot's text renderer.
+    for control in root.find_children("*", "Control", true, false):
+        (control as Control).layout_direction = Control.LAYOUT_DIRECTION_LTR
     # No pre-parent negative offsets: every gameplay control is placed in screen coordinates.
     call_deferred("update_hud_layout")
 
@@ -86,6 +98,7 @@ func style(bg: Color, border: Color = Color.TRANSPARENT, corner: int = 18, borde
 func label(text_value: String, font_size: int, text_color: Color, parent: Node, at: Vector2, extent: Vector2, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
     var n := Label.new()
     n.text = text_value
+    n.text_direction = Control.TEXT_DIRECTION_AUTO
     n.add_theme_font_size_override("font_size", font_size)
     n.add_theme_color_override("font_color", text_color)
     n.horizontal_alignment = align
@@ -109,6 +122,7 @@ func panel(parent: Node, anchor: int, at: Vector2, extent: Vector2, bg: Color, b
 func make_button(title: String, where: Control, at: Vector2, extent: Vector2, primary: bool = false) -> Button:
     var b := Button.new()
     b.text = title
+    b.text_direction = Control.TEXT_DIRECTION_AUTO
     b.position = at
     b.size = extent
     b.custom_minimum_size = extent
@@ -126,13 +140,13 @@ func make_button(title: String, where: Control, at: Vector2, extent: Vector2, pr
 func create_game_ui() -> void:
     var top := panel(root, Control.PRESET_TOP_LEFT, Vector2.ZERO, Vector2(264, 78), Color(0.023,0.052,0.080,0.90),Color("50717e"))
     hud_top = top
-    label("BALANCE   /   EGP", 13, Color("d9ab68"), top, Vector2(17,7), Vector2(232,21))
+    label("الرصيد  •  جنيه", 13, Color("d9ab68"), top, Vector2(17,7), Vector2(232,21))
     money_label = label("120",29,Color("fff8e6"),top,Vector2(16,28),Vector2(175,40))
-    rep_label = label("REP 0",14,Color("92d6c4"),top,Vector2(158,37),Vector2(95,23),HORIZONTAL_ALIGNMENT_RIGHT)
+    rep_label = label("السمعة  0",14,Color("92d6c4"),top,Vector2(158,37),Vector2(95,23),HORIZONTAL_ALIGNMENT_RIGHT)
     var mission := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(420,99),Color(0.020,0.052,0.074,0.86),Color("4d7180"))
     hud_mission = mission
-    label("CURRENT OBJECTIVE",13,Color("f2b86d"),mission,Vector2(15,7),Vector2(386,24))
-    objective_label = label("Find the delivery depot",18,Color("f8f8ee"),mission,Vector2(15,30),Vector2(388,31))
+    label("المهمة الحالية",13,Color("f2b86d"),mission,Vector2(15,7),Vector2(386,24))
+    objective_label = label("روح مكتب الشحن واستلم أول شغلانة",18,Color("f8f8ee"),mission,Vector2(15,30),Vector2(388,31))
     distance_label = label("",14,Color("9ed4cc"),mission,Vector2(15,60),Vector2(95,27))
     contract_countdown = label("",13,Color("efcc92"),mission,Vector2(109,59),Vector2(290,27),HORIZONTAL_ALIGNMENT_RIGHT)
     radar = CityRadar.new()
@@ -140,11 +154,11 @@ func create_game_ui() -> void:
     radar.size = Vector2(120,120)
     var bottom := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(183,42),Color(0.023,0.053,0.076,0.78))
     hud_bottom = bottom
-    stamina_label = label("ENERGY   100%",16,Color("b9e6d7"),bottom,Vector2(12,3),Vector2(170,35))
+    stamina_label = label("الطاقة  ١٠٠٪",16,Color("b9e6d7"),bottom,Vector2(12,3),Vector2(170,35))
     hud_crosshair = label("·",27,Color("ffffff"),root,Vector2.ZERO,Vector2(28,28),HORIZONTAL_ALIGNMENT_CENTER)
     var prompt := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(320,49),Color(0.025,0.065,0.087,0.78),Color("3f6c77"))
     hud_prompt = prompt
-    contextual_label = label("Explore the city",15,Color("f5eddf"),prompt,Vector2(11,4),Vector2(295,40),HORIZONTAL_ALIGNMENT_CENTER)
+    contextual_label = label("اتفرّج على المدينة",15,Color("f5eddf"),prompt,Vector2(11,4),Vector2(295,40),HORIZONTAL_ALIGNMENT_CENTER)
     toast_label = label("",19,Color("ffeac8"),root,Vector2.ZERO,Vector2(550,44),HORIZONTAL_ALIGNMENT_CENTER)
     toast_label.visible = false
     hud_pause_button = make_button("Ⅱ",root,Vector2.ZERO,Vector2(54,52))
@@ -152,18 +166,19 @@ func create_game_ui() -> void:
     if is_mobile:
         stick=MobileStick.new()
         root.add_child(stick)
+        stick.layout_direction=Control.LAYOUT_DIRECTION_LTR
         stick.size=Vector2(172,172)
         stick.moved.connect(func(v: Vector2)->void: touch_moved.emit(v))
-        action_button = make_button("USE",root,Vector2.ZERO,Vector2(102,74),true)
+        action_button = make_button("تفاعل",root,Vector2.ZERO,Vector2(102,74),true)
         action_button.pressed.connect(func()->void: interact_pressed.emit())
         action_button.disabled=true
-        run_button = make_button("RUN",root,Vector2.ZERO,Vector2(92,62))
+        run_button = make_button("جري",root,Vector2.ZERO,Vector2(92,62))
         run_button.button_down.connect(func()->void: run_changed.emit(true))
         run_button.button_up.connect(func()->void: run_changed.emit(false))
-        jump_button = make_button("JUMP",root,Vector2.ZERO,Vector2(89,52))
+        jump_button = make_button("نط",root,Vector2.ZERO,Vector2(89,52))
         jump_button.pressed.connect(func()->void: jump_pressed.emit())
     else:
-        var hint := label("WASD MOVE     •     MOUSE LOOK     •     SHIFT SPRINT     •     E INTERACT",14,Color("bdd4db"),root,Vector2.ZERO,Vector2(680,26),HORIZONTAL_ALIGNMENT_CENTER)
+        var hint := label("WASD للحركة  •  الماوس للنظر  •  Shift للجري  •  E للتفاعل",14,Color("bdd4db"),root,Vector2.ZERO,Vector2(680,26),HORIZONTAL_ALIGNMENT_CENTER)
         hint.name="DesktopHint"
 
 func _process(_delta: float) -> void:
@@ -189,17 +204,17 @@ func update_hud_layout() -> void:
     place_control(hud_top,Vector2(margin,margin),Vector2(264,78)*k)
     place_control(hud_mission,Vector2(v.x - 420*k - margin,margin),Vector2(420,99)*k)
     place_control(radar,Vector2(v.x-134*k-margin,121*k),Vector2(120,120)*k)
-    place_control(hud_bottom,Vector2(margin,v.y - 53*k - margin),Vector2(183,42)*k)
-    place_control(hud_prompt,Vector2(v.x-334*k-margin,v.y-62*k-margin),Vector2(320,49)*k)
+    place_control(hud_bottom,Vector2(margin,106*k),Vector2(183,42)*k)
+    place_control(hud_prompt,Vector2(v.x/2-160*k,v.y-60*k-margin),Vector2(320,49)*k)
     place_control(hud_crosshair,Vector2(v.x/2-14*k,v.y/2-14*k),Vector2(28,28)*k)
     place_control(toast_label,Vector2(v.x/2 - 275*k,135*k),Vector2(550,44)*k)
-    place_control(hud_pause_button,Vector2(v.x-75*k-margin,255*k),Vector2(54,52)*k)
+    place_control(hud_pause_button,Vector2(v.x-75*k-margin,240*k),Vector2(54,52)*k)
     if is_mobile:
-        var joystick_diameter: float=170*k
-        place_control(stick,Vector2(margin+12*k,v.y-joystick_diameter-28*k),Vector2.ONE*joystick_diameter)
-        place_control(action_button,Vector2(v.x-128*k-margin,v.y-194*k),Vector2(108,72)*k)
-        place_control(run_button,Vector2(v.x-244*k-margin,v.y-154*k),Vector2(98,60)*k)
-        place_control(jump_button,Vector2(v.x-127*k-margin,v.y-114*k),Vector2(108,54)*k)
+        var joystick_diameter: float=190*k
+        place_control(stick,Vector2(margin+24*k,v.y-joystick_diameter-22*k),Vector2.ONE*joystick_diameter)
+        place_control(action_button,Vector2(v.x-143*k-margin,v.y-200*k),Vector2(108,72)*k)
+        place_control(run_button,Vector2(v.x-263*k-margin,v.y-153*k),Vector2(98,60)*k)
+        place_control(jump_button,Vector2(v.x-145*k-margin,v.y-110*k),Vector2(108,54)*k)
         # The joystick follows all size changes: its center must not remain at the old coordinates.
         if stick.active_index < 0:
             stick.center_position=stick.global_position+stick.size*0.5
@@ -214,13 +229,13 @@ func update_hud_layout() -> void:
 
 func _toggle_run() -> void:
     running = not running
-    run_button.text = "WALK" if running else "RUN"
+    run_button.text = "مشي" if running else "جري"
     run_changed.emit(running)
 
 func update_stats(cash: int, rep: int, stamina: float) -> void:
-    money_label.text = "%d EGP" % cash
-    rep_label.text = "REP %d" % rep
-    stamina_label.text = "ENERGY  %d%%" % roundi(stamina)
+    money_label.text = "%d ج" % cash
+    rep_label.text = "سمعة %d" % rep
+    stamina_label.text = "الطاقة  %d%%" % roundi(stamina)
     stamina_label.add_theme_color_override("font_color", Color("fb9a88") if stamina < 25.0 else Color("b8e8d5"))
 
 func update_radar(position3d: Vector3, yaw: float, goal_id: String) -> void:
@@ -228,15 +243,15 @@ func update_radar(position3d: Vector3, yaw: float, goal_id: String) -> void:
 
 func update_contract_clock(remaining: float, total: int, active: bool) -> void:
     if not active:
-        contract_countdown.text = "TAKE A CONTRACT AT THE DEPOT"
+        contract_countdown.text = "روح مكتب الشحن واختار شغلانة"
     elif remaining > 0.0:
-        contract_countdown.text = "TIME BONUS  •  %ds LEFT  •  %d EGP BASE" % [ceili(remaining), total]
+        contract_countdown.text = "مكافأة السرعة • %d ثانية • %d جنيه" % [ceili(remaining), total]
     else:
-        contract_countdown.text = "LATE DELIVERY  •  %d EGP BASE" % total
+        contract_countdown.text = "التوصيل اتأخر • %d جنيه" % total
 
 func update_objective(message: String, meters: int) -> void:
     objective_label.text = message
-    distance_label.text = "%dm AWAY" % meters if meters > 5 else "YOU'RE HERE"
+    distance_label.text = "فاضل %d متر" % meters if meters > 5 else "وصلت للمكان"
 
 func update_interaction(message: String, ready: bool) -> void:
     contextual_label.text = ("[E]  " if ready and not is_mobile else "") + message
@@ -260,7 +275,7 @@ func create_startup() -> void:
     startup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     # Real-time city remains visible behind a two-tone cinematic scrim.
     var dark := ColorRect.new()
-    dark.color=Color(0.012,0.029,0.043,0.81)
+    dark.color=Color(0.012,0.029,0.043,0.52)
     startup.add_child(dark)
     dark.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     var strip := ColorRect.new()
@@ -268,19 +283,22 @@ func create_startup() -> void:
     strip.name="AccentBar"
     startup.add_child(strip)
     startup_detail = panel(startup,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(500,570),Color(0.025,0.062,0.082,0.45))
-    startup_detail.add_theme_stylebox_override("panel",style(Color(0.035,0.075,0.095,0.4),Color.TRANSPARENT,6))
-    startup_kicker=label("CHAPTER 01     /     YOUR FIRST 120 EGP",17,Color("f2b66b"),startup,Vector2.ZERO,Vector2(640,34))
-    startup_title=label("FROM ZERO",75,Color("fff5e7"),startup,Vector2.ZERO,Vector2(730,98))
-    startup_subtitle=label("EVERY EMPIRE STARTS SOMEWHERE",20,Color("bacdd4"),startup,Vector2.ZERO,Vector2(750,46))
-    startup_play=make_button("▶     PLAY NOW",startup,Vector2.ZERO,Vector2(360,75),true)
+    startup_detail.add_theme_stylebox_override("panel",style(Color(0.035,0.075,0.095,0.80),Color.TRANSPARENT,6))
+    startup_kicker=label("الفصل الأول  •  بداية الحكاية",17,Color("f2b66b"),startup,Vector2.ZERO,Vector2(640,34))
+    startup_title=label("من الصفر",81,Color("fff5e7"),startup,Vector2.ZERO,Vector2(730,98))
+    startup_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+    startup_kicker.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+    startup_subtitle=label("معاك ١٢٠ جنيه... هتوصل لفين؟",23,Color("bacdd4"),startup,Vector2.ZERO,Vector2(750,46))
+    startup_subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+    startup_play=make_button("▶   ابدأ اللعب",startup,Vector2.ZERO,Vector2(360,75),true)
     startup_play.add_theme_font_size_override("font_size",28)
     startup_play.pressed.connect(func()->void:
         startup.visible=false
         play_pressed.emit()
     )
-    startup_settings=make_button("⚙     SETTINGS",startup,Vector2.ZERO,Vector2(360,64))
+    startup_settings=make_button("⚙   الإعدادات",startup,Vector2.ZERO,Vector2(360,64))
     startup_settings.pressed.connect(open_settings)
-    startup_footer=label("FIRST-PERSON  •  OPEN CITY  •  BUILD YOUR STORY",14,Color("96b2ba"),startup,Vector2.ZERO,Vector2(690,36))
+    startup_footer=label("عيشها بنفسك  •  اشتغل  •  اتاجر  •  كوّن مستقبلك",18,Color("96b2ba"),startup,Vector2.ZERO,Vector2(690,36))
     var v := get_viewport().get_visible_rect().size
     if v.x>400: layout_main_menu(v,clampf(v.y/720.0,0.65,1.5),maxf(14.0,v.x*0.014))
 
@@ -315,16 +333,16 @@ func create_pause_menu() -> void:
     col.add_theme_constant_override("separation", 15)
     c.add_child(col)
     var title := Label.new()
-    title.text = "CITY PAUSED"
+    title.text = "اللعبة متوقفة"
     title.add_theme_font_size_override("font_size", 51)
     title.add_theme_color_override("font_color", Color("f7f0df"))
     col.add_child(title)
-    var resume := make_button("BACK TO THE CITY", col, Vector2.ZERO, Vector2(340, 70), true)
+    var resume := make_button("كمّل لعب", col, Vector2.ZERO, Vector2(340, 70), true)
     resume.pressed.connect(func() -> void: pause_pressed.emit())
-    var pause_settings := make_button("⚙ SETTINGS", col, Vector2.ZERO, Vector2(340,63))
+    var pause_settings := make_button("⚙ الإعدادات", col, Vector2.ZERO, Vector2(340,63))
     pause_settings.pressed.connect(open_settings)
     var info := Label.new()
-    info.text = "Progress saves automatically after each transaction."
+    info.text = "اللعبة بتحفظ تقدمك تلقائيًا."
     info.add_theme_color_override("font_color", Color("b5c9d3"))
     col.add_child(info)
 
@@ -356,12 +374,12 @@ func create_settings_screen() -> void:
     content.add_theme_constant_override("separation", 15)
     outer.add_child(content)
     var title := Label.new()
-    title.text = "⚙  SETTINGS"
+    title.text = "⚙  الإعدادات"
     title.add_theme_font_size_override("font_size", 34)
     title.add_theme_color_override("font_color",Color("fff5df"))
     content.add_child(title)
     var volume_lbl := Label.new()
-    volume_lbl.text = "MASTER VOLUME"
+    volume_lbl.text = "مستوى الصوت"
     volume_lbl.add_theme_font_size_override("font_size",20)
     content.add_child(volume_lbl)
     var volume_slider := HSlider.new()
@@ -377,7 +395,7 @@ func create_settings_screen() -> void:
         apply_settings()
     )
     var look_lbl := Label.new()
-    look_lbl.text = "CAMERA SENSITIVITY"
+    look_lbl.text = "حساسية الكاميرا"
     look_lbl.add_theme_font_size_override("font_size",20)
     content.add_child(look_lbl)
     var sensitivity := HSlider.new()
@@ -394,7 +412,7 @@ func create_settings_screen() -> void:
     )
     var shadows := CheckButton.new()
     shadows.name = "ShadowsToggle"
-    shadows.text = "QUALITY SHADOWS & ATMOSPHERE"
+    shadows.text = "ظلال وإضاءة بجودة أعلى"
     shadows.button_pressed = quality_high
     shadows.add_theme_font_size_override("font_size",18)
     content.add_child(shadows)
@@ -402,7 +420,7 @@ func create_settings_screen() -> void:
         quality_high = v
         apply_settings()
     )
-    var back := make_button("SAVE & BACK",content,Vector2.ZERO,Vector2(490,60),true)
+    var back := make_button("حفظ ورجوع",content,Vector2.ZERO,Vector2(490,60),true)
     back.pressed.connect(func() -> void:
         save_settings()
         settings_screen.visible = false
@@ -464,7 +482,7 @@ func create_contract_board() -> void:
     col.add_theme_constant_override("separation", 12)
     margin.add_child(col)
     var heading := Label.new()
-    heading.text = "THE DEPOT  /  CONTRACT BOARD"
+    heading.text = "مكتب الشحن  •  الشغلانات المتاحة"
     heading.add_theme_font_size_override("font_size", 30)
     heading.add_theme_color_override("font_color", Color("ffd58c"))
     col.add_child(heading)
@@ -475,16 +493,16 @@ Higher-tier contracts require reputation."
     guidance.add_theme_color_override("font_color", Color("bdcdd3"))
     col.add_child(guidance)
     var descriptions := [
-        "LOCAL RUN    •    95 EGP    •    80 SEC    •    REP 0",
-        "EXPRESS      •    160 EGP  •    65 SEC    •    REP 20",
-        "PRIORITY     •    260 EGP  •    50 SEC    •    REP 80",
+        "توصيل قريب  •  ٩٥ جنيه  •  ٨٠ ثانية  •  بدون شروط",
+        "توصيل سريع  •  ١٦٠ جنيه  •  ٦٥ ثانية  •  سمعة ٢٠",
+        "طلبية مهمة  •  ٢٦٠ جنيه  •  ٥٠ ثانية  •  سمعة ٨٠",
     ]
     for tier in range(3):
         var b := make_button(descriptions[tier], col, Vector2.ZERO, Vector2(600, 62), tier == 0)
         b.add_theme_font_size_override("font_size", 17)
         b.pressed.connect(_choose_contract.bind(tier))
         contract_buttons.append(b)
-    var back := make_button("NOT NOW", col, Vector2.ZERO, Vector2(600, 54))
+    var back := make_button("رجوع", col, Vector2.ZERO, Vector2(600, 54))
     back.pressed.connect(func() -> void:
         contract_panel.visible = false
         contract_board_closed.emit()

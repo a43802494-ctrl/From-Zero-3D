@@ -4,10 +4,10 @@ class_name RiseCity
 # Curated neighborhood built with actual licensed Kenney 3D models (GLB) and
 # a few simple collision-only/road surfaces. Run tools/fetch_models.py first.
 const POINTS := [
-    {"id":"depot", "title":"THE DEPOT", "position":Vector3(-23, 0, -20), "building":Vector3(-23, 0, -31), "color":"f6b967"},
-    {"id":"cafe", "title":"CAFE TWENTY4", "position":Vector3(23, 0, -20), "building":Vector3(23, 0, -31), "color":"ffac8e"},
-    {"id":"market", "title":"MINI MARKET", "position":Vector3(-23, 0, 20), "building":Vector3(-23, 0, 31), "color":"72dabb"},
-    {"id":"agency", "title":"BUSINESS HUB", "position":Vector3(23, 0, 20), "building":Vector3(23, 0, 31), "color":"b0c7ff"},
+    {"id":"depot", "title":"مكتب الشحن", "position":Vector3(-23, 0, -20), "building":Vector3(-23, 0, -31), "color":"f6b967"},
+    {"id":"cafe", "title":"قهوة الحارة", "position":Vector3(23, 0, -20), "building":Vector3(23, 0, -31), "color":"ffac8e"},
+    {"id":"market", "title":"سوبر ماركت", "position":Vector3(-23, 0, 20), "building":Vector3(-23, 0, 31), "color":"72dabb"},
+    {"id":"agency", "title":"مكتب المشاريع", "position":Vector3(23, 0, 20), "building":Vector3(23, 0, 31), "color":"b0c7ff"},
 ]
 
 var model_cache: Dictionary = {}
@@ -37,18 +37,18 @@ func surface(hex_value: String, rough: float = 0.94) -> StandardMaterial3D:
 
 func setup_materials() -> void:
     palette = {
-        "ground": surface("687a68"),
-        "asphalt": surface("2d3239"),
-        "pavement": surface("a5aaa3"),
-        "kerb": surface("cbd0c8"),
+        "ground": surface("637b65"),
+        "asphalt": surface("292d34"),
+        "pavement": surface("92938f"),
+        "kerb": surface("b6b8ae"),
         "line": surface("e9dfc5"),
         "accent": surface("f5b85c"),
     }
     fancy_materials = {
-        "plaster_cream": surface("d8c8ab",0.89),
-        "plaster_sand": surface("a9aa96",0.9),
-        "plaster_rust": surface("bb8466",0.91),
-        "concrete": surface("b1aba1",0.9),
+        "plaster_cream": surface("a99a87",0.89),
+        "plaster_sand": surface("8a8f83",0.9),
+        "plaster_rust": surface("ae7d61",0.91),
+        "concrete": surface("90938e",0.9),
         "dark_frame": surface("29363b",0.46),
         "aluminum": surface("536672",0.35),
         "glass": surface("244254",0.17),
@@ -98,6 +98,25 @@ func setup_materials() -> void:
         mat.albedo_texture = ImageTexture.create_from_image(img)
         mat.uv1_scale = Vector3(12, 12, 1)
         mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+    # Prebaked neutral, tileable diffuse + normal maps; geometric sidewalk joins
+    # now catch daylight without needing heavyweight shaders on Android.
+    var texture_materials := {
+        "asphalt": palette["asphalt"],
+        "pavement": palette["pavement"],
+        "concrete": fancy_materials["concrete"],
+        "plaster": fancy_materials["plaster_cream"],
+        "brick": fancy_materials["brick"],
+    }
+    for name in texture_materials.keys():
+        var m: StandardMaterial3D = texture_materials[name]
+        var albedo_path: String = "res://assets/textures/%s_albedo.png" % name
+        var normal_path: String = "res://assets/textures/%s_normal.png" % name
+        m.albedo_texture = load(albedo_path)
+        m.normal_texture = load(normal_path)
+        m.normal_enabled = true
+        m.normal_scale = 0.6
+        m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 func box(parent: Node3D, center: Vector3, dimensions: Vector3, mat: Material, solid: bool = false) -> void:
     var mesh := MeshInstance3D.new()
@@ -173,15 +192,15 @@ func setup_atmosphere() -> void:
     var environment := Environment.new()
     var sky := Sky.new()
     var procedural := ProceduralSkyMaterial.new()
-    procedural.sky_top_color = Color("638ca9")
-    procedural.sky_horizon_color = Color("e4c6a4")
-    procedural.ground_horizon_color = Color("adb6aa")
+    procedural.sky_top_color = Color("6e9ab8")
+    procedural.sky_horizon_color = Color("ecd1a7")
+    procedural.ground_horizon_color = Color("b1afa3")
     sky.sky_material = procedural
     environment.background_mode = Environment.BG_SKY
     environment.sky = sky
     environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
     environment.reflected_light_source = Environment.REFLECTION_SOURCE_BG
-    environment.ambient_light_energy = 0.72
+    environment.ambient_light_energy = 0.46
     environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
     environment.fog_enabled = true
     environment.fog_density = 0.0016
@@ -191,8 +210,8 @@ func setup_atmosphere() -> void:
     add_child(world_environment)
     var sun := DirectionalLight3D.new()
     sun.rotation_degrees = Vector3(-47, -31, 0)
-    sun.light_color = Color("ffdfb5")
-    sun.light_energy = 1.15
+    sun.light_color = Color("ffe4c7")
+    sun.light_energy = 0.96
     sun.shadow_enabled = true
     sun.directional_shadow_max_distance = 65
     city_sun = sun
@@ -221,6 +240,9 @@ func create_streets() -> void:
 func shop_label(txt: String, location: Vector3, color: String) -> void:
     var label3d := Label3D.new()
     label3d.text = txt
+    var arabic_world_font := SystemFont.new()
+    arabic_world_font.font_names = PackedStringArray(["Noto Naskh Arabic", "Noto Sans Arabic", "sans-serif"])
+    label3d.font = arabic_world_font
     label3d.font_size = 54
     label3d.pixel_size = 0.009
     label3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -242,7 +264,7 @@ func make_district() -> void:
     for x in [-60.0,-42.0,42.0,60.0]:
         for z in [-59.0,-39.0,39.0,59.0]:
             var id: String = commercial[index % commercial.size()]
-            model("city-kit-commercial", id, Vector3(x,0,z), 14.0, PI if z > 0 else 0.0)
+            model("city-kit-commercial", id, Vector3(x,0,z), 12.0, PI if z > 0 else 0.0)
             invisible_collision(Vector3(x, 6, z), Vector3(12,12,12))
             index += 1
     var homes := ["building-type-a","building-type-c","building-type-e","building-type-i","building-type-m","building-type-q"]
@@ -250,7 +272,7 @@ func make_district() -> void:
         for i in range(5):
             var name_id: String = homes[(i + (0 if side > 0 else 2)) % homes.size()]
             var pos := Vector3(side * 68, 0, -52.0 + i * 24.0)
-            model("city-kit-suburban", name_id, pos, 10.5, PI/2 if side > 0 else -PI/2)
+            model("city-kit-suburban", name_id, pos, 9.8, PI/2 if side > 0 else -PI/2)
 
 func add_street_details() -> void:
     for side in [-1.0,1.0]:
@@ -278,7 +300,7 @@ func spawn_city_life() -> void:
         if i < 4:
             cars.append({"node":car_node,"start":car_node.position,"phase":float(i)*3.0,"direction":1.0 if i % 2==0 else -1.0})
     var people := ["character-male-a","character-male-b","character-male-c","character-female-a","character-female-b","character-female-c"]
-    for i in range(7):
+    for i in range(0):
         var side := -1.0 if i%2 == 0 else 1.0
         var pos := Vector3(-43+float(i%6)*16.0, 0, side * (15.0 + float(i%3)*4))
         var npc := model("mini-characters", people[i%people.size()], pos, 0.95, PI/2)
@@ -288,7 +310,7 @@ func spawn_city_life() -> void:
 # authored shopfront geometry (framed glazing, shutters, upper floors, fascia,
 # balconies and clear pedestrian streets). Every visible feature is 3D.
 func add_street_architecture() -> void:
-    var frontage_labels := ["THE DEPOT", "TWENTY FOUR CAFE", "CORNER MARKET", "BUSINESS HUB"]
+    var frontage_labels := ["مكتب الشحن", "قهوة الحارة", "سوبر ماركت", "مكتب المشاريع"]
     var front_tones := ["plaster_cream", "plaster_rust", "plaster_sand", "plaster_cream"]
     for n in range(4):
         var point: Dictionary=POINTS[n]
@@ -320,6 +342,9 @@ func create_shop_front(x: float, front_z: float, side: float, title: String, wal
     # Painted signage is a world-space 3D label; never painted on the screen HUD.
     var sign := Label3D.new()
     sign.text=title
+    var sign_font := SystemFont.new()
+    sign_font.font_names = PackedStringArray(["Noto Naskh Arabic", "Noto Sans Arabic", "sans-serif"])
+    sign.font=sign_font
     sign.position=Vector3(0,3.56,-side*0.48)
     sign.font_size=64
     sign.pixel_size=0.0088
@@ -380,8 +405,8 @@ func make_urban_furniture() -> void:
 func spawn_animated_people() -> void:
     # Licensed, skinned glTF NPC. Its authored glTF animation actually plays.
     # Cesium Man is CC-BY 4.0 and documented in assets/ATTRIBUTIONS.md.
-    for i in range(3):
-        var pos := Vector3(-15.0+float(i)*14.0,0.0, -13.2 if i%2==0 else 13.2)
+    for i in range(5):
+        var pos := Vector3(-34.0+float(i)*14.0,0.0, -13.2 if i%2==0 else 13.2)
         var npc:=model("animated-npc","CesiumMan",pos,0.75,PI*0.5)
         var players:=npc.find_children("*","AnimationPlayer",true,false)
         if not players.is_empty():
@@ -409,4 +434,4 @@ func _process(delta: float) -> void:
         var t := elapsed*1.25 + float(npc["phase"])
         actor.position = origin + Vector3(sin(t)*2.5 if npc["axis"] == 0 else 0.0, 0.0, sin(t)*2.5 if npc["axis"] == 1 else 0.0)
         actor.rotation.y = PI/2 if cos(t) >= 0 else -PI/2
-        actor.scale.y = 1.0 + sin(t*6.0)*0.022
+        actor.scale.y = 1.0
