@@ -266,8 +266,8 @@ func make_district() -> void:
         build_service_desk(poi, index)
     var residential := ["apartment-block","office-building","apartment-block"]
     for i in range(9):
-        var x := [-57.0,-41.0,41.0,57.0][i%4]
-        var z := [-59.0,-43.0,43.0,59.0][int(i/4)%4]
+        var x: float = [-57.0,-41.0,41.0,57.0][i%4]
+        var z: float = [-59.0,-43.0,43.0,59.0][int(i/4)%4]
         model("realworld/architecture",residential[i%3],Vector3(x,0,z),14.0 if i%3==0 else 17.0, PI if z > 0 else 0.0)
         invisible_collision(Vector3(x,5.5,z),Vector3(11,11,11))
 
