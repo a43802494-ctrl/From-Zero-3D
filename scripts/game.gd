@@ -44,6 +44,15 @@ func _ready() -> void:
     add_child(hud)
     hud.play_pressed.connect(start_game)
     hud.new_game_pressed.connect(start_new_game)
+    hud.settings_visibility_changed.connect(func(opened: bool) -> void:
+        if not in_game: return
+        if opened:
+            player.set_playing(false)
+            hud.set_controls_active(false)
+        elif not paused and not contract_board_open:
+            player.set_playing(true)
+            hud.set_controls_active(true)
+    )
     hud.interact_pressed.connect(interact)
     hud.jump_pressed.connect(func() -> void: player.request_jump())
     hud.pause_pressed.connect(toggle_pause)
@@ -186,7 +195,7 @@ func current_objective() -> String:
     return "ارجع مكتب الشحن وخد شغلانة جديدة"
 
 func _process(delta: float) -> void:
-    if not in_game or paused or contract_board_open: return
+    if not in_game or paused or contract_board_open or hud.settings_open: return
     var near := ""
     var best_dist := 3.7
     for p in RiseCity.POINTS:

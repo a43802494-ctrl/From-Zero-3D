@@ -3,6 +3,7 @@ class_name GameHUD
 
 signal play_pressed
 signal new_game_pressed
+signal settings_visibility_changed(is_open: bool)
 signal settings_changed(look_value: float, high_quality: bool)
 signal interact_pressed
 signal run_changed(enabled: bool)
@@ -329,14 +330,16 @@ func layout_main_menu(v: Vector2, k: float, margin: float) -> void:
     var accent: Control = startup.get_node("AccentBar")
     place_control(accent,Vector2(x,y-4*k),Vector2(88,5)*k)
     place_control(startup_kicker,Vector2(x,y+10*k),Vector2(470,32)*k)
+    startup_title.add_theme_font_size_override("font_size", clampi(int(card_width/5.4), 40, 80))
     place_control(startup_title,Vector2(x,y+46*k),Vector2(card_width,96*k))
     place_control(startup_subtitle,Vector2(x,y+144*k),Vector2(card_width,42*k))
     var button_width: float = card_width - 40*k
     var button_x: float = x+10*k
     place_control(startup_play,Vector2(button_x,y+218*k),Vector2(button_width,68*k))
     place_control(startup_new_game,Vector2(button_x,y+292*k),Vector2(button_width,55*k))
-    place_control(startup_settings,Vector2(button_x,y+355*k),Vector2(button_width,55*k))
-    place_control(startup_footer,Vector2(x,y+421*k),Vector2(card_width,30*k))
+    var settings_y: float = 355.0 if startup_new_game.visible else 300.0
+    place_control(startup_settings,Vector2(button_x,y+settings_y*k),Vector2(button_width,55*k))
+    place_control(startup_footer,Vector2(x,y+(settings_y+66.0)*k),Vector2(card_width,30*k))
 
 func create_pause_menu() -> void:
     pause_screen = Control.new()
@@ -447,11 +450,13 @@ func create_settings_screen() -> void:
         save_settings()
         settings_screen.visible = false
         settings_open = false
+        settings_visibility_changed.emit(false)
     )
 
 func open_settings() -> void:
     settings_open = true
     settings_screen.visible = true
+    settings_visibility_changed.emit(true)
 
 func apply_settings() -> void:
     AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.0001,volume_percent/100.0)))
