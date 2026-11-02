@@ -4,7 +4,7 @@ class_name CityPlayer
 const WALK_SPEED := 5.8
 const RUN_SPEED := 9.2
 const ACCELERATION := 22.0
-const BRAKING := 30.0
+const BRAKING := 24.0
 const JUMP_VELOCITY := 6.5
 const GRAVITY := 18.0
 const MOUSE_SENS := 0.0024
@@ -22,6 +22,7 @@ var cam: Camera3D
 var held_package: Node3D
 var step_timer := 0.0
 var bob_clock := 0.0
+var footstep_volume := 0.22
 var footstep_player: AudioStreamPlayer
 var jump_requested := false
 var move_yaw_rate := 0.0
@@ -74,8 +75,8 @@ func _ready() -> void:
     # Professional hand meshes and proper animations belong in the art pass.
 
     footstep_player = AudioStreamPlayer.new()
-    footstep_player.volume_db = -14.0
-    footstep_player.stream = load("res://audio/step.ogg")
+    footstep_player.volume_db = -22.0
+    footstep_player.stream = preload("res://audio/soft_step.ogg")
     add_child(footstep_player)
 
 func build_first_person_arms() -> void:
@@ -108,8 +109,10 @@ func build_first_person_arms() -> void:
 
 func set_playing(enabled: bool) -> void:
     control_active = enabled
-    if not enabled:
+    if not control_active:
         touch_move = Vector2.ZERO
+        if footstep_player != null and footstep_player.playing:
+            footstep_player.stop()
         filtered_touch_move = Vector2.ZERO
         look_touch_index = -1
         run_toggle = false
@@ -118,6 +121,10 @@ func set_playing(enabled: bool) -> void:
         Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     else:
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if enabled else Input.MOUSE_MODE_VISIBLE
+
+func set_footstep_volume(level: float) -> void:
+    footstep_volume = clampf(level, 0.0, 1.0)
+    footstep_player.volume_db = linear_to_db(maxf(0.0001, footstep_volume)) if footstep_volume > 0.0 else -80.0
 
 func set_touch_move(value: Vector2) -> void:
     # Use a consistent dead-zone; the physics loop smooths movement independent of FPS.
@@ -185,17 +192,25 @@ func _physics_process(delta: float) -> void:
     jump_requested = false
     move_and_slide()
     
-    var moving := d.length() > 0.1 and is_on_floor()
+    # Keep the camera level: large positional head-bob made each footstep feel
+    # like a short freeze on phones with uneven frame times.
+    var planar_speed := Vector2(velocity.x, velocity.z).length()
+    var moving := is_on_floor() and planar_speed > 1.0
+    var target_bob := 0.0
     if moving:
-        bob_clock += delta * (13.0 if running else 9.5)
-        cam.position.y = sin(bob_clock) * 0.028
+        bob_clock += delta * (10.5 if running else 8.0)
+        target_bob = sin(bob_clock) * 0.005
+    cam.position.y = lerpf(cam.position.y, target_bob, 1.0 - exp(-10.0 * delta))
+    # Soft footstep texture, varied subtly by gait; no overlapping/restarted clicks.
+    if moving and footstep_volume > 0.0:
         step_timer -= delta
-        if step_timer <= 0.0:
-            footstep_player.pitch_scale = randf_range(0.9, 1.1)
+        if step_timer <= 0.0 and not footstep_player.playing:
+            footstep_player.pitch_scale = randf_range(0.95, 1.045)
             footstep_player.play()
-            step_timer = 0.34 if running else 0.48
+            step_timer = 0.40 if running else 0.55
     else:
-        cam.position.y = move_toward(cam.position.y, 0.0, delta * 0.18)
-        step_timer = 0.04
+        step_timer = 0.08
+        if footstep_player.playing:
+            footstep_player.stop()
     if held_package.visible:
         held_package.position.y = -0.70 + sin(bob_clock) * 0.012

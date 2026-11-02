@@ -1,4 +1,4 @@
-name: من الصفر | إصلاحات الأساس والشخصيات 0.8
+name: من الصفر | سلاسة الحركة والصوت والوضوح 0.8.1
 
 on:
   push:
@@ -77,6 +77,7 @@ jobs:
           export FROMZERO_TEST_MOBILE=1
           run_checked_test res://tests/mobile_controls_tests.gd "ARABIC UI + LTR JOYSTICK LEFT + 8-WAY TOUCH: PASS"
           run_checked_test res://tests/world_scale_tests.gd "WORLD NPC HEIGHT 1.6-1.9m + PHYSICAL VENDORS + TRAFFIC: PASS"
+          run_checked_test res://tests/experience_regressions.gd "HUD CONTRAST + SOFT FOOTSTEPS: PASS"
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --quit-after 70
 
       - name: Build Arabic 3D reality pass Android APK
@@ -84,13 +85,13 @@ jobs:
         run: |
           set -eu
           mkdir -p build
-          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.8-core-debug.apk
-          test -s build/From-Zero-3D-v0.8-core-debug.apk
+          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.8.1-smooth-debug.apk
+          test -s build/From-Zero-3D-v0.8.1-smooth-debug.apk
 
       - name: Publish internal APK
         uses: actions/upload-artifact@v4
         with:
-          name: From-Zero-3D-v08-CoreRepair-Android-debug
-          path: build/From-Zero-3D-v0.8-core-debug.apk
+          name: From-Zero-3D-v081-SmoothWalk-Android-debug
+          path: build/From-Zero-3D-v0.8.1-smooth-debug.apk
           if-no-files-found: error
           retention-days: 14

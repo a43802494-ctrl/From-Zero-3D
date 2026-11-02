@@ -31,6 +31,7 @@ var contract_seconds := 0.0
 var contract_tier := 0
 var save_clock := 0.0
 var radar_clock := 0.0
+var hud_clock := 0.0
 
 func _ready() -> void:
     world = RiseCity.new()
@@ -60,11 +61,15 @@ func _ready() -> void:
     hud.contract_board_closed.connect(close_contract_board)
     hud.run_changed.connect(func(yes: bool) -> void: player.run_toggle = yes)
     hud.touch_moved.connect(func(direction: Vector2) -> void: player.set_touch_move(direction))
+    hud.footsteps_changed.connect(func(level: float) -> void:
+        player.set_footstep_volume(level)
+    )
     hud.settings_changed.connect(func(sensitivity: float, high_quality: bool) -> void:
         player.look_sensitivity = sensitivity
         world.configure_graphics(high_quality)
     )
     player.look_sensitivity = hud.look_sens
+    player.set_footstep_volume(hud.steps_percent / 100.0)
     world.configure_graphics(hud.quality_high)
     create_waypoint()
     # Front-page uses its own aerial view; enter the body camera on Play.
@@ -223,9 +228,13 @@ func _process(delta: float) -> void:
     waypoint.position = target_pos + Vector3(0, 0.12, 0)
     waypoint.rotation.y += delta * 0.65
     waypoint.visible = distance < 19 and distance > 2
-    hud.update_objective(current_objective(), distance)
+    hud_clock += delta
+    if hud_clock >= 0.15:
+        hud_clock = 0.0
+        hud.update_objective(current_objective(), distance)
     contract_seconds = maxf(-0.01, contract_seconds - delta) if package_active else 0.0
-    hud.update_contract_clock(contract_seconds, contract_reward, package_active)
+    if hud_clock == 0.0:
+        hud.update_contract_clock(contract_seconds, contract_reward, package_active)
     radar_clock += delta
     if radar_clock >= 0.12:
         radar_clock = 0.0
@@ -247,10 +256,11 @@ func _process(delta: float) -> void:
             hud.toast("اتبيعت بضاعة بـ٣٥ جنيه • باقي %d قطع" % business_stock)
             play_effect("res://audio/reward.ogg")
     save_clock += delta
-    if save_clock > 12.0:
+    if save_clock > 30.0:
         save_clock = 0.0
         save_progress()
-    refresh_ui()
+    if hud_clock == 0.0:
+        refresh_ui()
 
 func interaction_text(id: String) -> String:
     match id:

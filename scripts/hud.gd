@@ -5,6 +5,7 @@ signal play_pressed
 signal new_game_pressed
 signal settings_visibility_changed(is_open: bool)
 signal settings_changed(look_value: float, high_quality: bool)
+signal footsteps_changed(volume_level: float)
 signal interact_pressed
 signal run_changed(enabled: bool)
 signal touch_moved(direction: Vector2)
@@ -26,6 +27,7 @@ var objective_label: Label
 var distance_label: Label
 var contextual_label: Label
 var toast_label: Label
+var toast_panel: Panel
 var startup: Control
 var pause_screen: Control
 var stick: MobileStick
@@ -59,8 +61,9 @@ var settings_screen: Control
 var startup_card: PanelContainer
 var settings_open := false
 var look_sens := 1.0
-var quality_high := true
+var quality_high := not OS.has_feature("mobile")
 var volume_percent := 80.0
+var steps_percent := 22.0
 
 
 func _ready() -> void:
@@ -163,8 +166,14 @@ func create_game_ui() -> void:
     var prompt := panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(320,49),Color(0.025,0.065,0.087,0.78),Color("3f6c77"))
     hud_prompt = prompt
     contextual_label = label("اتفرّج على المدينة",15,Color("f5eddf"),prompt,Vector2(11,4),Vector2(295,40),HORIZONTAL_ALIGNMENT_CENTER)
-    toast_label = label("",19,Color("ffeac8"),root,Vector2.ZERO,Vector2(550,44),HORIZONTAL_ALIGNMENT_CENTER)
-    toast_label.visible = false
+    # Opaque contrast panel: text must remain readable over sunlit white buildings.
+    toast_panel = panel(root,Control.PRESET_TOP_LEFT,Vector2.ZERO,Vector2(600,82),Color(0.018,0.045,0.068,0.96),Color("83b6bc"))
+    toast_panel.visible = false
+    toast_label = label("",20,Color("fff2d9"),toast_panel,Vector2(16,6),Vector2(568,70),HORIZONTAL_ALIGNMENT_CENTER)
+    toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    toast_label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.87))
+    toast_label.add_theme_constant_override("shadow_offset_x",1)
+    toast_label.add_theme_constant_override("shadow_offset_y",2)
     hud_pause_button = make_button("Ⅱ",root,Vector2.ZERO,Vector2(54,52))
     hud_pause_button.pressed.connect(func()->void: pause_pressed.emit())
     if is_mobile:
@@ -213,7 +222,8 @@ func update_hud_layout() -> void:
     place_control(hud_bottom,Vector2(margin,106*k),Vector2(183,42)*k)
     place_control(hud_prompt,Vector2(v.x/2-160*k,v.y-60*k-margin),Vector2(320,49)*k)
     place_control(hud_crosshair,Vector2(v.x/2-14*k,v.y/2-14*k),Vector2(28,28)*k)
-    place_control(toast_label,Vector2(v.x/2 - 275*k,135*k),Vector2(550,44)*k)
+    place_control(toast_panel,Vector2(v.x/2-300*k,116*k),Vector2(600,82)*k)
+    place_control(toast_label,Vector2(16,6)*k,Vector2(568,70)*k)
     place_control(hud_pause_button,Vector2(v.x-74*k-margin,241*k),Vector2(54,52)*k)
     if is_mobile:
         var joystick_diameter: float=177*k
@@ -230,6 +240,8 @@ func update_hud_layout() -> void:
     layout_main_menu(v,k,margin)
     if settings_card:
         settings_card.custom_minimum_size=Vector2(minf(v.x-32,570*k),minf(v.y-28,466*k))
+    if settings_card:
+        settings_card.custom_minimum_size.y = minf(v.y - 20.0, 520.0 * k)
     if contract_card:
         contract_card.custom_minimum_size=Vector2(minf(v.x-30,695*k),minf(v.y-20,520*k))
 
@@ -245,9 +257,12 @@ func _toggle_run() -> void:
     run_changed.emit(running)
 
 func update_stats(cash: int, rep: int, stamina: float) -> void:
-    money_label.text = "%d ج" % cash
-    rep_label.text = "سمعة %d" % rep
-    stamina_label.text = "الطاقة  %d%%" % roundi(stamina)
+    var money_text := "%d ج" % cash
+    var rep_text := "سمعة %d" % rep
+    var stamina_text := "الطاقة  %d%%" % roundi(stamina)
+    if money_label.text != money_text: money_label.text = money_text
+    if rep_label.text != rep_text: rep_label.text = rep_text
+    if stamina_label.text != stamina_text: stamina_label.text = stamina_text
     stamina_label.add_theme_color_override("font_color", Color("fb9a88") if stamina < 25.0 else Color("b8e8d5"))
 
 func update_radar(position3d: Vector3, yaw: float, goal_id: String) -> void:
@@ -262,11 +277,13 @@ func update_contract_clock(remaining: float, total: int, active: bool) -> void:
         contract_countdown.text = "التوصيل اتأخر • %d جنيه" % total
 
 func update_objective(message: String, meters: int) -> void:
-    objective_label.text = message
-    distance_label.text = "فاضل %d متر" % meters if meters > 5 else "وصلت للمكان"
+    if objective_label.text != message: objective_label.text = message
+    var distance_text := "فاضل %d متر" % meters if meters > 5 else "وصلت للمكان"
+    if distance_label.text != distance_text: distance_label.text = distance_text
 
 func update_interaction(message: String, ready: bool) -> void:
-    contextual_label.text = ("[E]  " if ready and not is_mobile else "") + message
+    var prompt_text := ("[E]  " if ready and not is_mobile else "") + message
+    if contextual_label.text != prompt_text: contextual_label.text = prompt_text
     action_enabled = ready
     if action_button != null:
         action_button.disabled = not ready
@@ -275,9 +292,9 @@ func toast(message: String) -> void:
     message_id += 1
     var mine := message_id
     toast_label.text = message
-    toast_label.visible = true
+    toast_panel.visible = true
     get_tree().create_timer(3.1).timeout.connect(func() -> void:
-        if mine == message_id: toast_label.visible = false
+        if mine == message_id: toast_panel.visible = false
     )
 
 func create_startup() -> void:
@@ -389,15 +406,18 @@ func create_settings_screen() -> void:
     center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     var card := PanelContainer.new()
     settings_card = card
-    card.custom_minimum_size = Vector2(560,425)
+    card.custom_minimum_size = Vector2(560,505)
     card.add_theme_stylebox_override("panel", style(Color("122635"),Color("ddae65"),22,2))
     center.add_child(card)
     var outer := MarginContainer.new()
     for side in ["left","right","top","bottom"]: outer.add_theme_constant_override("margin_"+side, 30)
     card.add_child(outer)
+    var scroll := ScrollContainer.new()
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    outer.add_child(scroll)
     var content := VBoxContainer.new()
-    content.add_theme_constant_override("separation", 15)
-    outer.add_child(content)
+    content.add_theme_constant_override("separation", 10)
+    scroll.add_child(content)
     var title := Label.new()
     title.text = "⚙  الإعدادات"
     title.add_theme_font_size_override("font_size", 34)
@@ -418,6 +438,22 @@ func create_settings_screen() -> void:
     volume_slider.value_changed.connect(func(v: float) -> void:
         volume_percent = v
         apply_settings()
+    )
+    var steps_lbl := Label.new()
+    steps_lbl.text = "صوت خطوات المشي (صفر = صامت)"
+    steps_lbl.add_theme_font_size_override("font_size", 18)
+    content.add_child(steps_lbl)
+    var steps_slider := HSlider.new()
+    steps_slider.name = "StepsSlider"
+    steps_slider.min_value = 0
+    steps_slider.max_value = 100
+    steps_slider.step = 5
+    steps_slider.value = steps_percent
+    steps_slider.custom_minimum_size.y = 32
+    content.add_child(steps_slider)
+    steps_slider.value_changed.connect(func(v: float) -> void:
+        steps_percent = v
+        footsteps_changed.emit(steps_percent / 100.0)
     )
     var look_lbl := Label.new()
     look_lbl.text = "حساسية الكاميرا"
@@ -461,10 +497,12 @@ func open_settings() -> void:
 func apply_settings() -> void:
     AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.0001,volume_percent/100.0)))
     settings_changed.emit(look_sens, quality_high)
+    footsteps_changed.emit(steps_percent / 100.0)
 
 func save_settings() -> void:
     var config := ConfigFile.new()
     config.set_value("audio","volume",volume_percent)
+    config.set_value("audio","footsteps",steps_percent)
     config.set_value("input","look",look_sens)
     config.set_value("graphics","shadows",quality_high)
     config.save("user://settings.cfg")
@@ -473,11 +511,13 @@ func load_settings() -> void:
     var cfg := ConfigFile.new()
     if cfg.load("user://settings.cfg") == OK:
         volume_percent = float(cfg.get_value("audio","volume",80.0))
+        steps_percent = clampf(float(cfg.get_value("audio","footsteps",22.0)),0.0,100.0)
         look_sens = float(cfg.get_value("input","look",1.0))
-        quality_high = bool(cfg.get_value("graphics","shadows",true))
+        quality_high = bool(cfg.get_value("graphics","shadows",quality_high))
     var sliders := settings_screen.find_children("*","HSlider",true,false)
     for item in sliders:
         if item.name == "VolumeSlider": item.value = volume_percent
+        elif item.name == "StepsSlider": item.value = steps_percent
         elif item.name == "LookSlider": item.value = look_sens
     var shadows := settings_screen.find_child("ShadowsToggle",true,false) as CheckButton
     if shadows: shadows.button_pressed = quality_high

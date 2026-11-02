@@ -279,7 +279,9 @@ func shop_label(txt: String, location: Vector3, color: String) -> void:
     label3d.pixel_size = 0.009
     label3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
     label3d.modulate = Color.html(color)
-    label3d.outline_size = 8
+    label3d.outline_size = 20
+    label3d.outline_modulate = Color(0.02,0.03,0.04,1.0)
+    # Labels that float over very light storefronts require a dark outline.
     label3d.position = location
     add_child(label3d)
 
