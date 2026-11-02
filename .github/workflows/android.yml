@@ -1,4 +1,4 @@
-name: FROM ZERO | Arabic Rebuild + Left Thumbstick v0.6
+name: من الصفر | تحسين رسومات ومهام وتحكم 0.7
 
 on:
   push:
@@ -9,6 +9,7 @@ jobs:
   android:
     name: Import models, validate controls, export Android
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     container:
       image: barichello/godot-ci:4.6.3
     steps:
@@ -23,12 +24,16 @@ jobs:
           apt-get install -y --no-install-recommends python3 python3-numpy python3-pil ca-certificates fontconfig
           python3 tools/fetch_models.py
           python3 tools/make_surfaces.py
+          python3 tests/quality_gate.py
           test -s assets/textures/asphalt_albedo.png
           test -s assets/textures/concrete_normal.png
           test -s assets/models/city-kit-commercial/building-a.glb
           test -s assets/models/mini-characters/character-male-a.glb
           test -s assets/models/car-kit/taxi.glb
           test -s assets/models/animated-npc/CesiumMan.glb
+          test -s assets/models/realworld/architecture/apartment-block.glb
+          test -s assets/models/realworld/vehicles/white-sedan.glb
+          test -s assets/models/realworld/people/sam-walk.glb
 
       - name: Restore Android export SDK and templates
         shell: bash
@@ -53,22 +58,22 @@ jobs:
         shell: bash
         run: |
           set -eu
-          godot --headless --path . --script res://tests/economy_tests.gd
-          FROMZERO_TEST_MOBILE=1 godot --headless --path . --script res://tests/mobile_controls_tests.gd
-          timeout 125 godot --headless --path . --quit-after 70
+          timeout --signal=TERM 40s godot --headless --path . --script res://tests/economy_tests.gd
+          FROMZERO_TEST_MOBILE=1 timeout --signal=TERM 40s godot --headless --path . --script res://tests/mobile_controls_tests.gd
+          timeout --signal=TERM 120s godot --headless --path . --quit-after 70
 
-      - name: Build Arabic Android debug APK
+      - name: Build Arabic 3D reality pass Android APK
         shell: bash
         run: |
           set -eu
           mkdir -p build
-          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.6-Arabic-debug.apk
-          test -s build/From-Zero-3D-v0.6-Arabic-debug.apk
+          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.7-rebuild-debug.apk
+          test -s build/From-Zero-3D-v0.7-rebuild-debug.apk
 
       - name: Publish internal APK
         uses: actions/upload-artifact@v4
         with:
-          name: From-Zero-3D-v06-Arabic-Android-debug
-          path: build/From-Zero-3D-v0.6-Arabic-debug.apk
+          name: From-Zero-3D-v07-RealWorld-Android-debug
+          path: build/From-Zero-3D-v0.7-rebuild-debug.apk
           if-no-files-found: error
           retention-days: 14

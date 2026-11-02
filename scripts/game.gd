@@ -84,40 +84,28 @@ func play_effect(file: String) -> void:
 
 func create_waypoint() -> void:
     waypoint = Node3D.new()
+    waypoint.name = "حلقة_الهدف"
     add_child(waypoint)
-    var orb := MeshInstance3D.new()
-    var sphere_mesh := SphereMesh.new()
-    sphere_mesh.radius = 0.4
-    sphere_mesh.height = 0.8
-    sphere_mesh.radial_segments = 12
-    sphere_mesh.rings = 6
-    orb.mesh = sphere_mesh
-    var glow := StandardMaterial3D.new()
-    glow.albedo_color = Color("ffd27d")
-    glow.emission_enabled = true
-    glow.emission = Color("ffbb62")
-    glow.emission_energy_multiplier = 1.8
-    orb.material_override = glow
-    waypoint.add_child(orb)
-    var beam := MeshInstance3D.new()
-    var pillar := CylinderMesh.new()
-    pillar.top_radius = 0.022
-    pillar.bottom_radius = 0.022
-    pillar.height = 2.8
-    beam.mesh = pillar
-    beam.position.y = -1.64
-    beam.material_override = glow
-    waypoint.add_child(beam)
+    var ring := MeshInstance3D.new()
+    var torus := TorusMesh.new()
+    torus.inner_radius = 0.80
+    torus.outer_radius = 0.94
+    torus.rings = 64
+    torus.ring_segments = 8
+    ring.mesh = torus
+    ring.position.y = 0.035
+    var accent := StandardMaterial3D.new()
+    accent.albedo_color=Color("ebc174")
+    accent.emission_enabled=true
+    accent.emission=Color("b87623")
+    accent.emission_energy_multiplier=0.4
+    accent.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+    accent.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+    ring.material_override=accent
+    waypoint.add_child(ring)
     waypoint_label = Label3D.new()
-    waypoint_label.text = "الهدف"
-    waypoint_label.font_size = 50
-    var label_font := SystemFont.new()
-    label_font.font_names = PackedStringArray(["Noto Naskh Arabic", "Noto Sans Arabic", "sans-serif"])
-    waypoint_label.font=label_font
-    waypoint_label.pixel_size = 0.007
-    waypoint_label.position.y = 0.85
-    waypoint_label.modulate = Color("ffe6b7")
-    waypoint_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    waypoint_label.text = ""
+    waypoint_label.visible = false
     waypoint.add_child(waypoint_label)
 
 func start_game() -> void:
@@ -169,7 +157,7 @@ func current_objective() -> String:
 func _process(delta: float) -> void:
     if not in_game or paused or contract_board_open: return
     var near := ""
-    var best_dist := 4.4
+    var best_dist := 5.5
     for p in RiseCity.POINTS:
         var diff: Vector3 = player.global_position - p["position"]
         diff.y = 0.0
@@ -184,10 +172,12 @@ func _process(delta: float) -> void:
     
     var objective: Dictionary = get_point(target_id())
     var target_pos: Vector3 = objective["position"]
-    var distance := int(player.global_position.distance_to(target_pos))
-    waypoint.position = target_pos + Vector3(0, 4.5 + sin(Time.get_ticks_msec() * 0.002) * 0.25, 0)
-    waypoint.rotation.y += delta * 1.7
-    waypoint_label.text = "%s  •  %dm" % [objective["title"], distance]
+    var horizontal := player.global_position - target_pos
+    horizontal.y=0.0
+    var distance := int(horizontal.length())
+    waypoint.position = target_pos + Vector3(0, 0.12, 0)
+    waypoint.rotation.y += delta * 0.65
+    waypoint.visible = distance < 19 and distance > 2
     hud.update_objective(current_objective(), distance)
     contract_seconds = maxf(-0.01, contract_seconds - delta) if package_active else 0.0
     hud.update_contract_clock(contract_seconds, contract_reward, package_active)
@@ -293,7 +283,7 @@ func accept_contract(tier: int) -> void:
     package_active = true
     player.set_package(true)
     close_contract_board()
-    hud.toast("استلمت الطلب! امشي ناحية العلامة وروح " + get_point(destination_id)["title"])
+    hud.toast("الطلب في إيدك. روح " + get_point(destination_id)["title"] + " واضغط تفاعل عند الكاونتر.")
     play_effect("res://audio/reward.ogg")
     save_progress()
 

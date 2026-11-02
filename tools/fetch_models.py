@@ -60,3 +60,48 @@ def download():
 
 if __name__=='__main__':
     download()
+
+
+# CC0 detailed, real-world-scale assets by Innerscene (https://www.innerscene.com/).
+# See assets/ATTRIBUTIONS.md. These are full 3D GLB meshes, not flat illustrations.
+DETAILED_ASSETS = {
+    "architecture/apartment-block": "four-storey-apartment-block-331e1924",
+    "architecture/office-building": "three-storey-office-building-16b33ce5",
+    "architecture/supermarket": "supermarket-building-52b858d3",
+    "vehicles/white-sedan": "white-four-door-sedan-1f271353",
+    "vehicles/red-sedan": "red-four-door-sedan-1d32e180",
+    "vehicles/silver-hatchback": "silver-five-door-compact-hatchback-6bf4a878",
+    "vehicles/pickup": "pickup-truck-da45aa3f",
+    "people/sam-walk": "relaxed-walk-sam-3d-person-animated-732f1206",
+    "people/harper-walk": "relaxed-walk-harper-3d-person-animated-b504cbac",
+    "people/maya-locomotion": "locomotion-collection-maya-3d-person-animated-1499b2fd",
+}
+
+def download_detail_assets():
+    import urllib.error
+    for asset_id, slug in DETAILED_ASSETS.items():
+        dest = ROOT / f'assets/models/realworld/{asset_id}.glb'
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists() and dest.stat().st_size > 100000:
+            continue
+        url = f'https://www.innerscene.com/api/library/{slug}/download'
+        for attempt in range(3):
+            try:
+                request = urllib.request.Request(url, headers={
+                    'User-Agent': 'Mozilla/5.0 FromZeroGame/0.7 (open-source CC0 asset loader)',
+                    'Accept': 'application/octet-stream,*/*',
+                })
+                with urllib.request.urlopen(request, timeout=95) as response:
+                    raw = response.read()
+                if not raw.startswith(b'glTF') or len(raw) < 100000:
+                    raise ValueError(f'Unexpected GLB response: {slug}, bytes={len(raw)}')
+                dest.write_bytes(raw)
+                print('RealWorldCC0:', asset_id, len(raw), 'bytes')
+                break
+            except Exception as ex:
+                if attempt == 2:
+                    raise RuntimeError(f'Asset fetch failed: {url}: {ex}') from ex
+                time.sleep(3 * (attempt + 1))
+
+if __name__ == '__main__':
+    download_detail_assets()

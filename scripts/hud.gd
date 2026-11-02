@@ -51,6 +51,7 @@ var settings_card: PanelContainer
 var pause_center: CenterContainer
 var contract_card: PanelContainer
 var ui_layout_size := Vector2.ZERO
+var menu_identity_line: ColorRect
 var settings_screen: Control
 var startup_card: PanelContainer
 var settings_open := false
@@ -201,20 +202,20 @@ func update_hud_layout() -> void:
     ui_layout_size=v
     var k: float = clampf(v.y/720.0,0.65,1.50)
     var margin: float = maxf(14.0, v.x*0.014)
-    place_control(hud_top,Vector2(margin,margin),Vector2(264,78)*k)
-    place_control(hud_mission,Vector2(v.x - 420*k - margin,margin),Vector2(420,99)*k)
+    place_control(hud_top,Vector2(margin,margin),Vector2(255,80)*k)
+    place_control(hud_mission,Vector2(v.x - 425*k - margin,margin),Vector2(425,99)*k)
     place_control(radar,Vector2(v.x-134*k-margin,121*k),Vector2(120,120)*k)
     place_control(hud_bottom,Vector2(margin,106*k),Vector2(183,42)*k)
     place_control(hud_prompt,Vector2(v.x/2-160*k,v.y-60*k-margin),Vector2(320,49)*k)
     place_control(hud_crosshair,Vector2(v.x/2-14*k,v.y/2-14*k),Vector2(28,28)*k)
     place_control(toast_label,Vector2(v.x/2 - 275*k,135*k),Vector2(550,44)*k)
-    place_control(hud_pause_button,Vector2(v.x-75*k-margin,240*k),Vector2(54,52)*k)
+    place_control(hud_pause_button,Vector2(v.x-74*k-margin,226*k),Vector2(54,52)*k)
     if is_mobile:
-        var joystick_diameter: float=190*k
-        place_control(stick,Vector2(margin+24*k,v.y-joystick_diameter-22*k),Vector2.ONE*joystick_diameter)
-        place_control(action_button,Vector2(v.x-143*k-margin,v.y-200*k),Vector2(108,72)*k)
-        place_control(run_button,Vector2(v.x-263*k-margin,v.y-153*k),Vector2(98,60)*k)
-        place_control(jump_button,Vector2(v.x-145*k-margin,v.y-110*k),Vector2(108,54)*k)
+        var joystick_diameter: float=177*k
+        place_control(stick,Vector2(margin+10*k,v.y-joystick_diameter-25*k),Vector2.ONE*joystick_diameter)
+        place_control(action_button,Vector2(v.x-134*k-margin,v.y-200*k),Vector2(112,68)*k)
+        place_control(run_button,Vector2(v.x-258*k-margin,v.y-158*k),Vector2(96,60)*k)
+        place_control(jump_button,Vector2(v.x-134*k-margin,v.y-112*k),Vector2(112,56)*k)
         # The joystick follows all size changes: its center must not remain at the old coordinates.
         if stick.active_index < 0:
             stick.center_position=stick.global_position+stick.size*0.5
@@ -290,31 +291,31 @@ func create_startup() -> void:
     startup_kicker.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
     startup_subtitle=label("معاك ١٢٠ جنيه... هتوصل لفين؟",23,Color("bacdd4"),startup,Vector2.ZERO,Vector2(750,46))
     startup_subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
-    startup_play=make_button("▶   ابدأ اللعب",startup,Vector2.ZERO,Vector2(360,75),true)
+    startup_play=make_button("ابدأ اللعب  ←",startup,Vector2.ZERO,Vector2(360,75),true)
     startup_play.add_theme_font_size_override("font_size",28)
     startup_play.pressed.connect(func()->void:
         startup.visible=false
         play_pressed.emit()
     )
-    startup_settings=make_button("⚙   الإعدادات",startup,Vector2.ZERO,Vector2(360,64))
+    startup_settings=make_button("⚙  الإعدادات",startup,Vector2.ZERO,Vector2(360,64))
     startup_settings.pressed.connect(open_settings)
-    startup_footer=label("عيشها بنفسك  •  اشتغل  •  اتاجر  •  كوّن مستقبلك",18,Color("96b2ba"),startup,Vector2.ZERO,Vector2(690,36))
+    startup_footer=label("شوارع مصر   /   شغل   /   مشاريع   /   تحديات",18,Color("96b2ba"),startup,Vector2.ZERO,Vector2(690,36))
     var v := get_viewport().get_visible_rect().size
     if v.x>400: layout_main_menu(v,clampf(v.y/720.0,0.65,1.5),maxf(14.0,v.x*0.014))
 
 func layout_main_menu(v: Vector2, k: float, margin: float) -> void:
     if startup == null or startup_title == null: return
-    var x := margin + 52*k
-    var y := v.y*0.20
-    place_control(startup_detail,Vector2(margin+18*k,margin+20*k),Vector2(minf(v.x*0.58,720*k),v.y-(margin+20*k)*2.0))
+    var x := v.x - minf(575*k,v.x*0.55) - margin
+    var y := v.y*0.14
+    place_control(startup_detail,Vector2(x-25*k,margin+15*k),Vector2(minf(v.x*0.48,530*k),v.y-2*margin-30*k))
     var accent: Control = startup.get_node("AccentBar")
-    place_control(accent,Vector2(x,y-32*k),Vector2(70,5)*k)
-    place_control(startup_kicker,Vector2(x,y),Vector2(640,32)*k)
-    place_control(startup_title,Vector2(x,y+30*k),Vector2(minf(v.x*0.65,730*k),97*k))
-    place_control(startup_subtitle,Vector2(x,y+126*k),Vector2(minf(v.x*0.69,725*k),42*k))
-    place_control(startup_play,Vector2(x,y+208*k),Vector2(365,73)*k)
-    place_control(startup_settings,Vector2(x,y+294*k),Vector2(365,61)*k)
-    place_control(startup_footer,Vector2(x,y+381*k),Vector2(690,32)*k)
+    place_control(accent,Vector2(x,y-4*k),Vector2(88,5)*k)
+    place_control(startup_kicker,Vector2(x,y+10*k),Vector2(470,32)*k)
+    place_control(startup_title,Vector2(x,y+50*k),Vector2(465,100)*k)
+    place_control(startup_subtitle,Vector2(x,y+157*k),Vector2(455,44)*k)
+    place_control(startup_play,Vector2(x+28*k,y+242*k),Vector2(408,69)*k)
+    place_control(startup_settings,Vector2(x+28*k,y+327*k),Vector2(408,62)*k)
+    place_control(startup_footer,Vector2(x,y+404*k),Vector2(468,32)*k)
 
 func create_pause_menu() -> void:
     pause_screen = Control.new()
@@ -487,8 +488,8 @@ func create_contract_board() -> void:
     heading.add_theme_color_override("font_color", Color("ffd58c"))
     col.add_child(heading)
     var guidance := Label.new()
-    guidance.text = "Choose a delivery. Beat the clock for a bonus.
-Higher-tier contracts require reputation."
+    guidance.text = "اختار الطلب اللي يناسبك. لو وصلت بدري، ليك مكافأة زيادة.
+شغلانات أعلى بتحتاج سمعة أعلى."
     guidance.add_theme_font_size_override("font_size", 17)
     guidance.add_theme_color_override("font_color", Color("bdcdd3"))
     col.add_child(guidance)

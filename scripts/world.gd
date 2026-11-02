@@ -24,7 +24,7 @@ func _ready() -> void:
     setup_atmosphere()
     create_streets()
     make_district()
-    add_street_architecture()
+    # Primary real-world buildings already have their own detailed architecture.
     add_street_details()
     spawn_city_life()
     spawn_animated_people()
@@ -252,27 +252,51 @@ func shop_label(txt: String, location: Vector3, color: String) -> void:
     add_child(label3d)
 
 func make_district() -> void:
-    var shops := ["building-a", "building-b", "building-f", "building-i"]
+    # Foreground is a carefully placed group of detailed architectural GLBs.
+    # These originals are unbranded, CC0, textured and scaled by scene bounds.
+    var buildings := ["architecture/apartment-block", "architecture/office-building", "architecture/supermarket", "architecture/office-building"]
     for index in range(POINTS.size()):
-        var p: Dictionary = POINTS[index]
-        model("city-kit-commercial", shops[index], p["building"], 16.5, 0.0 if index < 2 else PI)
-        invisible_collision(p["building"] + Vector3(0, 5, 0), Vector3(13.5, 10, 10.5))
-        shop_label(p["title"], p["position"] + Vector3(0, 4.4, 0), p["color"])
-        model("city-kit-commercial", "detail-awning" if index % 2 == 0 else "detail-awning-wide", p["position"] + Vector3(0, 2.4, 0), 3.2, PI if index < 2 else 0)
-    var commercial := ["building-c","building-d","building-e","building-g","building-h","building-j","building-k","building-l","building-m","building-n"]
-    var index := 0
-    for x in [-60.0,-42.0,42.0,60.0]:
-        for z in [-59.0,-39.0,39.0,59.0]:
-            var id: String = commercial[index % commercial.size()]
-            model("city-kit-commercial", id, Vector3(x,0,z), 12.0, PI if z > 0 else 0.0)
-            invisible_collision(Vector3(x, 6, z), Vector3(12,12,12))
-            index += 1
-    var homes := ["building-type-a","building-type-c","building-type-e","building-type-i","building-type-m","building-type-q"]
-    for side in [-1.0,1.0]:
-        for i in range(5):
-            var name_id: String = homes[(i + (0 if side > 0 else 2)) % homes.size()]
-            var pos := Vector3(side * 68, 0, -52.0 + i * 24.0)
-            model("city-kit-suburban", name_id, pos, 9.8, PI/2 if side > 0 else -PI/2)
+        var poi: Dictionary = POINTS[index]
+        var locator: Vector3 = poi["building"]
+        var model_id: String = buildings[index]
+        var pack_and_name := model_id.split("/")
+        model("realworld/"+pack_and_name[0],pack_and_name[1],locator,20.0 if index == 2 else 17.0, PI if index >= 2 else 0.0)
+        invisible_collision(locator + Vector3(0,6,0), Vector3(14,12,11))
+        shop_label(poi["title"],poi["position"]+Vector3(0,3.3,0),poi["color"])
+        build_service_desk(poi, index)
+    var residential := ["apartment-block","office-building","apartment-block"]
+    for i in range(9):
+        var x := [-57.0,-41.0,41.0,57.0][i%4]
+        var z := [-59.0,-43.0,43.0,59.0][int(i/4)%4]
+        model("realworld/architecture",residential[i%3],Vector3(x,0,z),14.0 if i%3==0 else 17.0, PI if z > 0 else 0.0)
+        invisible_collision(Vector3(x,5.5,z),Vector3(11,11,11))
+
+func build_service_desk(poi: Dictionary, index: int) -> void:
+    # Physical street-side interaction counter and parcel, not a beam or stick.
+    var p: Vector3=poi["position"]
+    var kiosk := Node3D.new()
+    kiosk.name="خدمة_"+str(poi["id"])
+    kiosk.position=p+Vector3(0,0,2.1 if index<2 else -2.1)
+    add_child(kiosk)
+    var metal: Material=fancy_materials["aluminum"]
+    box(kiosk,Vector3(0,0.54,0),Vector3(2.25,1.07,0.81),fancy_materials["wood"])
+    box(kiosk,Vector3(0,1.13,0),Vector3(2.55,0.16,1.03),fancy_materials["concrete"])
+    box(kiosk,Vector3(0,0.83,-0.45),Vector3(2.26,0.09,0.055),metal)
+    for x in [-0.67,0.54]:
+        var pack:=MeshInstance3D.new()
+        var cube:=BoxMesh.new();cube.size=Vector3(0.43,0.26,0.39)
+        pack.mesh=cube;pack.position=Vector3(x,1.35,-0.1)
+        pack.material_override=fancy_materials["plaster_sand"]
+        kiosk.add_child(pack)
+    var sign := Label3D.new()
+    sign.text = "استلام الطلبات" if index == 0 else "تسليم الطلب"
+    sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+    sign.font_size=54; sign.pixel_size=0.007
+    sign.font=SystemFont.new()
+    sign.position=Vector3(0,2.02,0)
+    sign.modulate=Color("ffe6ad")
+    sign.outline_size=5
+    kiosk.add_child(sign)
 
 func add_street_details() -> void:
     for side in [-1.0,1.0]:
@@ -292,19 +316,16 @@ func add_street_details() -> void:
         model("city-kit-roads", "dumpster", point["position"]+Vector3(5,0,4), 1.5)
 
 func spawn_city_life() -> void:
-    var car_ids := ["taxi", "sedan", "delivery", "van", "hatchback-sports", "suv", "truck"]
-    for i in range(12):
-        var x := -48.0 + float(i%6)*19.0
-        var z := -5.4 if i < 6 else 5.4
-        var car_node := model("car-kit", car_ids[i % car_ids.size()], Vector3(x,0,z), 3.2, 0 if i < 6 else PI)
-        if i < 4:
-            cars.append({"node":car_node,"start":car_node.position,"phase":float(i)*3.0,"direction":1.0 if i % 2==0 else -1.0})
-    var people := ["character-male-a","character-male-b","character-male-c","character-female-a","character-female-b","character-female-c"]
-    for i in range(0):
-        var side := -1.0 if i%2 == 0 else 1.0
-        var pos := Vector3(-43+float(i%6)*16.0, 0, side * (15.0 + float(i%3)*4))
-        var npc := model("mini-characters", people[i%people.size()], pos, 0.95, PI/2)
-        walkers.append({"node":npc,"origin":pos,"phase":float(i)*0.83,"axis":i%2})
+    # Detailed, unbranded vehicles at realistic dimensions (not toy cars).
+    var ids: Array[String] = ["white-sedan","red-sedan","silver-hatchback","pickup"]
+    var stops: Array[Vector3] = [
+        Vector3(-46,0,-5.3), Vector3(-24,0,-5.3), Vector3(29,0,-5.3),
+        Vector3(47,0,5.3), Vector3(15,0,5.3), Vector3(-36,0,5.3),
+    ]
+    for i in range(stops.size()):
+        var anchor:=model("realworld/vehicles",ids[i%ids.size()],stops[i],4.35 if ids[i%ids.size()] != "pickup" else 5.2,PI if i>2 else 0.0)
+        if i in [0,3]:
+            cars.append({"node":anchor,"start":anchor.position,"phase":i*2.0,"direction":1.0})
 
 # Architectural pass: actual commercial and residential GLB shells are given
 # authored shopfront geometry (framed glazing, shutters, upper floors, fascia,
@@ -403,19 +424,26 @@ func make_urban_furniture() -> void:
         box(self,Vector3(x,0.055,7.35),Vector3(6.0,0.018,0.14),palette["line"])
 
 func spawn_animated_people() -> void:
-    # Licensed, skinned glTF NPC. Its authored glTF animation actually plays.
-    # Cesium Man is CC-BY 4.0 and documented in assets/ATTRIBUTIONS.md.
-    for i in range(5):
-        var pos := Vector3(-34.0+float(i)*14.0,0.0, -13.2 if i%2==0 else 13.2)
-        var npc:=model("animated-npc","CesiumMan",pos,0.75,PI*0.5)
-        var players:=npc.find_children("*","AnimationPlayer",true,false)
-        if not players.is_empty():
-            var animator:=players[0] as AnimationPlayer
-            var clips:=animator.get_animation_list()
+    # Fully textured, skinned real-world human models with authored animation.
+    var actors: Array[String] = ["sam-walk", "harper-walk", "maya-locomotion", "sam-walk", "harper-walk"]
+    var positions: Array[Vector3] = [Vector3(-24,0,-19.0),Vector3(22,0,-19.0),Vector3(-24,0,19.0),Vector3(22,0,19.0),Vector3(0,0,17)]
+    for i in range(actors.size()):
+        var anchor:=model("realworld/people",actors[i],positions[i],0.78 if i==2 else 0.81,0.0)
+        var all_players:=anchor.find_children("*","AnimationPlayer",true,false)
+        if not all_players.is_empty():
+            var animation_player:=all_players[0] as AnimationPlayer
+            var clips:=animation_player.get_animation_list()
             if not clips.is_empty():
-                animator.play(clips[0])
-                animator.speed_scale=0.8+0.12*float(i)
-        walkers.append({"node":npc,"origin":pos,"phase":float(i)*2.2,"axis":i%2})
+                var chosen: String = clips[0]
+                for clip in clips:
+                    var lower:=clip.to_lower()
+                    if "idle" in lower or "relaxed" in lower:
+                        chosen=clip
+                        break
+                animation_player.play(chosen)
+                animation_player.speed_scale=0.9
+        if i == 4:
+            walkers.append({"node":anchor,"origin":positions[i],"phase":1.0,"axis":0})
 
 func configure_graphics(high_quality: bool) -> void:
     if city_sun: city_sun.shadow_enabled = high_quality
@@ -427,7 +455,7 @@ func _process(delta: float) -> void:
     for car in cars:
         var n: Node3D = car["node"]
         var a: Vector3 = car["start"]
-        n.position = a + Vector3(sin(elapsed*0.22 + car["phase"])*5.0, 0, 0)
+        n.position = a + Vector3(sin(elapsed*0.13 + car["phase"])*2.0, 0, 0)
     for npc in walkers:
         var actor: Node3D = npc["node"]
         var origin: Vector3 = npc["origin"]

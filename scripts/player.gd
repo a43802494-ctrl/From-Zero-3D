@@ -125,7 +125,7 @@ func request_jump() -> void:
     jump_requested = true
 
 func set_package(yes: bool) -> void:
-    held_package.visible = yes
+    held_package.visible = false # No foreground cardboard placeholder obstructing the view
 
 func _input(event: InputEvent) -> void:
     if not control_active:
@@ -161,7 +161,7 @@ func _physics_process(delta: float) -> void:
     
     # Smooth the joystick input (also on diagonals), but release quickly.
     var response: float = BRAKING if touch_move.length() < 0.10 else ACCELERATION
-    filtered_touch_move = filtered_touch_move.move_toward(touch_move, response * delta * 0.32)
+    filtered_touch_move = filtered_touch_move.move_toward(touch_move, response * delta * 0.42)
     var d := filtered_touch_move
     if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): d.y -= 1.0
     if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): d.y += 1.0
@@ -173,8 +173,9 @@ func _physics_process(delta: float) -> void:
     var direction := (global_transform.basis * Vector3(d.x, 0.0, d.y)).limit_length()
     var running := run_toggle or Input.is_key_pressed(KEY_SHIFT)
     var speed := (RUN_SPEED if running else WALK_SPEED) * (1.35 if has_scooter else 1.0) * fatigue_factor
-    velocity.x = move_toward(velocity.x, direction.x * speed, ACCELERATION * delta)
-    velocity.z = move_toward(velocity.z, direction.z * speed, ACCELERATION * delta)
+    var motion_response := ACCELERATION if d.length() > 0.1 else BRAKING
+    velocity.x = move_toward(velocity.x, direction.x * speed, motion_response * delta)
+    velocity.z = move_toward(velocity.z, direction.z * speed, motion_response * delta)
     if not is_on_floor():
         velocity.y -= GRAVITY * delta
     elif Input.is_key_pressed(KEY_SPACE) or jump_requested:

@@ -46,7 +46,7 @@ func reset() -> void:
 func is_move_zone(screen_pos: Vector2) -> bool:
     var viewport := get_viewport().get_visible_rect().size
     # Bottom-left quarter reserved for movement. The right half is camera.
-    return screen_pos.x >= 0 and screen_pos.x < viewport.x * 0.43 and screen_pos.y > viewport.y * 0.40 and screen_pos.y <= viewport.y
+    return screen_pos.x >= 0 and screen_pos.x < viewport.x * 0.38 and screen_pos.y > viewport.y * 0.48 and screen_pos.y <= viewport.y
 
 func set_touch_point(screen_pos: Vector2) -> void:
     max_radius = clampf(minf(size.x, size.y) * 0.33, 42.0, 88.0)
