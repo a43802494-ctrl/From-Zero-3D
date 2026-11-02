@@ -2,6 +2,7 @@ extends CanvasLayer
 class_name GameHUD
 
 signal play_pressed
+signal new_game_pressed
 signal settings_changed(look_value: float, high_quality: bool)
 signal interact_pressed
 signal run_changed(enabled: bool)
@@ -45,6 +46,7 @@ var startup_subtitle: Label
 var startup_kicker: Label
 var startup_footer: Label
 var startup_play: Button
+var startup_new_game: Button
 var startup_settings: Button
 var startup_detail: Panel
 var settings_card: PanelContainer
@@ -194,6 +196,8 @@ func place_control(control: Control, xy: Vector2, dimensions: Vector2) -> void:
     control.offset_top=xy.y
     control.offset_right=xy.x+dimensions.x
     control.offset_bottom=xy.y+dimensions.y
+    if control is Button:
+        (control as Button).custom_minimum_size = dimensions
 
 func update_hud_layout() -> void:
     if root == null: return
@@ -204,12 +208,12 @@ func update_hud_layout() -> void:
     var margin: float = maxf(14.0, v.x*0.014)
     place_control(hud_top,Vector2(margin,margin),Vector2(255,80)*k)
     place_control(hud_mission,Vector2(v.x - 425*k - margin,margin),Vector2(425,99)*k)
-    place_control(radar,Vector2(v.x-134*k-margin,121*k),Vector2(120,120)*k)
+    place_control(radar,Vector2(v.x-134*k-margin,106*k),Vector2(120,120)*k)
     place_control(hud_bottom,Vector2(margin,106*k),Vector2(183,42)*k)
     place_control(hud_prompt,Vector2(v.x/2-160*k,v.y-60*k-margin),Vector2(320,49)*k)
     place_control(hud_crosshair,Vector2(v.x/2-14*k,v.y/2-14*k),Vector2(28,28)*k)
     place_control(toast_label,Vector2(v.x/2 - 275*k,135*k),Vector2(550,44)*k)
-    place_control(hud_pause_button,Vector2(v.x-74*k-margin,226*k),Vector2(54,52)*k)
+    place_control(hud_pause_button,Vector2(v.x-74*k-margin,241*k),Vector2(54,52)*k)
     if is_mobile:
         var joystick_diameter: float=177*k
         place_control(stick,Vector2(margin+10*k,v.y-joystick_diameter-25*k),Vector2.ONE*joystick_diameter)
@@ -227,6 +231,12 @@ func update_hud_layout() -> void:
         settings_card.custom_minimum_size=Vector2(minf(v.x-32,570*k),minf(v.y-28,466*k))
     if contract_card:
         contract_card.custom_minimum_size=Vector2(minf(v.x-30,695*k),minf(v.y-20,520*k))
+
+func set_controls_active(enabled: bool) -> void:
+    if stick != null:
+        stick.set_controls_enabled(enabled)
+    if not enabled:
+        run_changed.emit(false)
 
 func _toggle_run() -> void:
     running = not running
@@ -288,14 +298,21 @@ func create_startup() -> void:
     startup_kicker=label("الفصل الأول  •  بداية الحكاية",17,Color("f2b66b"),startup,Vector2.ZERO,Vector2(640,34))
     startup_title=label("من الصفر",81,Color("fff5e7"),startup,Vector2.ZERO,Vector2(730,98))
     startup_title.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+    startup_title.clip_text = true
     startup_kicker.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
     startup_subtitle=label("معاك ١٢٠ جنيه... هتوصل لفين؟",23,Color("bacdd4"),startup,Vector2.ZERO,Vector2(750,46))
     startup_subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
-    startup_play=make_button("ابدأ اللعب  ←",startup,Vector2.ZERO,Vector2(360,75),true)
+    startup_play=make_button("كمّل اللعب" if FileAccess.file_exists("user://fromzero_progress.json") else "ابدأ اللعب",startup,Vector2.ZERO,Vector2(360,75),true)
     startup_play.add_theme_font_size_override("font_size",28)
     startup_play.pressed.connect(func()->void:
         startup.visible=false
         play_pressed.emit()
+    )
+    startup_new_game=make_button("ابدأ من الصفر",startup,Vector2.ZERO,Vector2(360,58))
+    startup_new_game.visible = FileAccess.file_exists("user://fromzero_progress.json")
+    startup_new_game.pressed.connect(func()->void:
+        startup.visible=false
+        new_game_pressed.emit()
     )
     startup_settings=make_button("⚙  الإعدادات",startup,Vector2.ZERO,Vector2(360,64))
     startup_settings.pressed.connect(open_settings)
@@ -305,17 +322,21 @@ func create_startup() -> void:
 
 func layout_main_menu(v: Vector2, k: float, margin: float) -> void:
     if startup == null or startup_title == null: return
-    var x := v.x - minf(575*k,v.x*0.55) - margin
-    var y := v.y*0.14
-    place_control(startup_detail,Vector2(x-25*k,margin+15*k),Vector2(minf(v.x*0.48,530*k),v.y-2*margin-30*k))
+    var card_width: float = minf(510*k,v.x*0.52)
+    var x: float = v.x - card_width - margin*2.0
+    var y: float = v.y*0.10
+    place_control(startup_detail,Vector2(x-15*k,margin+5*k),Vector2(card_width+22*k,v.y-2*margin-10*k))
     var accent: Control = startup.get_node("AccentBar")
     place_control(accent,Vector2(x,y-4*k),Vector2(88,5)*k)
     place_control(startup_kicker,Vector2(x,y+10*k),Vector2(470,32)*k)
-    place_control(startup_title,Vector2(x,y+50*k),Vector2(465,100)*k)
-    place_control(startup_subtitle,Vector2(x,y+157*k),Vector2(455,44)*k)
-    place_control(startup_play,Vector2(x+28*k,y+242*k),Vector2(408,69)*k)
-    place_control(startup_settings,Vector2(x+28*k,y+327*k),Vector2(408,62)*k)
-    place_control(startup_footer,Vector2(x,y+404*k),Vector2(468,32)*k)
+    place_control(startup_title,Vector2(x,y+46*k),Vector2(card_width,96*k))
+    place_control(startup_subtitle,Vector2(x,y+144*k),Vector2(card_width,42*k))
+    var button_width: float = card_width - 40*k
+    var button_x: float = x+10*k
+    place_control(startup_play,Vector2(button_x,y+218*k),Vector2(button_width,68*k))
+    place_control(startup_new_game,Vector2(button_x,y+292*k),Vector2(button_width,55*k))
+    place_control(startup_settings,Vector2(button_x,y+355*k),Vector2(button_width,55*k))
+    place_control(startup_footer,Vector2(x,y+421*k),Vector2(card_width,30*k))
 
 func create_pause_menu() -> void:
     pause_screen = Control.new()

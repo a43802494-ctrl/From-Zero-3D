@@ -14,6 +14,9 @@ var reputation := 0
 var energy := 100.0
 var deliveries := 0
 var package_active := false
+var awaiting_pickup := false
+var last_destination_id := ""
+var business_stock := 0
 var destination_id := "cafe"
 var scooter_owned := false
 var business_owned := false
@@ -40,6 +43,7 @@ func _ready() -> void:
     hud = GameHUD.new()
     add_child(hud)
     hud.play_pressed.connect(start_game)
+    hud.new_game_pressed.connect(start_new_game)
     hud.interact_pressed.connect(interact)
     hud.jump_pressed.connect(func() -> void: player.request_jump())
     hud.pause_pressed.connect(toggle_pause)
@@ -108,10 +112,35 @@ func create_waypoint() -> void:
     waypoint_label.visible = false
     waypoint.add_child(waypoint_label)
 
+func start_new_game() -> void:
+    # Explicit fresh start; continuing uses the existing saved game.
+    cash = 120
+    reputation = 0
+    energy = 100.0
+    deliveries = 0
+    package_active = false
+    awaiting_pickup = false
+    destination_id = "cafe"
+    last_destination_id = ""
+    scooter_owned = false
+    business_owned = false
+    business_stock = 0
+    business_clock = 0.0
+    contract_seconds = 0.0
+    contract_reward = 95
+    contract_tier = 0
+    player.position = Vector3(6, 1.2, 6)
+    player.rotation.y = deg_to_rad(38)
+    player.has_scooter = false
+    player.set_package(false)
+    save_progress()
+    start_game()
+
 func start_game() -> void:
     in_game = true
     paused = false
     player.set_playing(true)
+    hud.set_controls_active(true)
     player.cam.make_current()
     ambience.play()
     play_effect("res://audio/reward.ogg")
@@ -125,6 +154,7 @@ func toggle_pause() -> void:
         return
     paused = not paused
     player.set_playing(not paused)
+    hud.set_controls_active(not paused)
     hud.show_pause(paused)
     if paused: save_progress()
 
@@ -146,6 +176,7 @@ func get_point(id: String) -> Dictionary:
     return RiseCity.POINTS[0]
 
 func current_objective() -> String:
+    if awaiting_pickup: return "اتفق مع البائع واستلم الطرد من مكتب الشحن"
     if package_active:
         return "وصل الطلب لـ " + get_point(destination_id)["title"]
     if deliveries == 0:
@@ -157,21 +188,26 @@ func current_objective() -> String:
 func _process(delta: float) -> void:
     if not in_game or paused or contract_board_open: return
     var near := ""
-    var best_dist := 5.5
+    var best_dist := 3.7
     for p in RiseCity.POINTS:
-        var diff: Vector3 = player.global_position - p["position"]
-        diff.y = 0.0
-        var dist := diff.length()
-        if dist < best_dist:
+        var target: Vector3 = world.interaction_position(str(p["id"]))
+        var to_target: Vector3 = target - player.global_position
+        to_target.y = 0.0
+        var dist := to_target.length()
+        # Only offer interaction when standing by the physical counter and
+        # facing generally toward the service worker, not from behind a wall.
+        var forward: Vector3 = -player.global_transform.basis.z
+        forward.y = 0.0
+        if dist < best_dist and dist < 3.7 and forward.normalized().dot(to_target.normalized()) > 0.0:
             best_dist = dist
-            near = p["id"]
+            near = str(p["id"])
     current_poi = near
-    var context_text := "دور على شغل وابني مستقبلك"
+    var context_text := "قرّب من الموظف وبُص ناحيته عشان تتفاعل"
     if near != "": context_text = interaction_text(near)
     hud.update_interaction(context_text, near != "")
     
     var objective: Dictionary = get_point(target_id())
-    var target_pos: Vector3 = objective["position"]
+    var target_pos: Vector3 = world.interaction_position(str(objective["id"]))
     var horizontal := player.global_position - target_pos
     horizontal.y=0.0
     var distance := int(horizontal.length())
@@ -191,14 +227,15 @@ func _process(delta: float) -> void:
     else:
         energy = minf(100.0, energy + delta * 0.07)
     player.fatigue_factor = lerpf(0.78, 1.0, clampf(energy / 30.0, 0.0, 1.0))
-    if business_owned:
+    if business_owned and business_stock > 0:
         business_clock += delta
         if business_clock >= 35.0:
-            business_clock -= 35.0
+            business_clock = 0.0
+            business_stock -= 1
             cash += 35
             reputation += 1
             save_progress()
-            hud.toast("مشروعك كسب ٣٥ جنيه!")
+            hud.toast("اتبيعت بضاعة بـ٣٥ جنيه • باقي %d قطع" % business_stock)
             play_effect("res://audio/reward.ogg")
     save_clock += delta
     if save_clock > 12.0:
@@ -209,7 +246,8 @@ func _process(delta: float) -> void:
 func interaction_text(id: String) -> String:
     match id:
         "depot":
-            return "مكتب الشحن: معاك طلبية دلوقتي" if package_active else "مكتب الشحن: اختار شغلانة"
+            if awaiting_pickup: return "اتكلم مع الموظف واستلم الطرد"
+            return "معاك طلبية • لازم توصلها" if package_active else "اتكلم مع الموظف واختار شغلانة"
         "cafe":
             if package_active and destination_id == id: return "القهوة: سلّم الطلب"
             return "القهوة: وجبة بـ٢٥ جنيه تزود طاقتك"
@@ -218,19 +256,28 @@ func interaction_text(id: String) -> String:
             return "السوبر ماركت: سرعة أعلى بـ٤٠٠ جنيه" if not scooter_owned else "السوبر ماركت: التطوير معاك بالفعل"
         "agency":
             if package_active and destination_id == id: return "مكتب المشاريع: سلّم الطلب"
-            return "مكتب المشاريع: افتح مشروع بـ٩٠٠ جنيه" if not business_owned else "مكتب المشاريع: مشروعك شغّال"
+            if not business_owned: return "مكتب المشاريع: افتح مشروع بـ٩٠٠ جنيه"
+            return "خلص المخزون! جدده بـ١٠٠ جنيه" if business_stock == 0 else "المشروع: فاضل %d قطع في المخزون" % business_stock
     return "اتفرج على المدينة"
 
 func interact() -> void:
     if not in_game or paused or contract_board_open or current_poi == "": return
     match current_poi:
         "depot":
-            if package_active:
+            if awaiting_pickup:
+                awaiting_pickup = false
+                package_active = true
+                player.set_package(true)
+                hud.toast("استلمت الطرد من الموظف. روح لـ%s" % get_point(destination_id)["title"])
+                play_effect("res://audio/buy.ogg")
+                save_progress()
+            elif package_active:
                 hud.toast("سلّم الطلب اللي معاك الأول!")
                 play_effect("res://audio/nope.ogg")
             else:
                 contract_board_open = true
                 player.set_playing(false)
+                hud.set_controls_active(false)
                 hud.show_contract_board(true, reputation)
         "cafe", "market", "agency":
             if package_active and current_poi == destination_id:
@@ -255,13 +302,20 @@ func interact() -> void:
                     save_progress()
                 else: cannot_afford()
             elif current_poi == "agency":
-                if business_owned:
-                    hud.toast("مشروعك شغّال وبيكسبك!")
-                elif cash >= 900:
+                if business_owned and business_stock > 0:
+                    hud.toast("عندك %d قطع • لما تخلص تعالى جدد المخزون" % business_stock)
+                elif business_owned and cash >= 100:
+                    cash -= 100
+                    business_stock = 6
+                    hud.toast("اشتريت ٦ قطع بضاعة بـ١٠٠ جنيه")
+                    play_effect("res://audio/buy.ogg")
+                    save_progress()
+                elif not business_owned and cash >= 900:
                     cash -= 900
                     business_owned = true
+                    business_stock = 6
                     reputation += 35
-                    hud.toast("مبروك! فتحت أول مشروع ليك!")
+                    hud.toast("مبروك! افتتحت مشروعك ومعاك أول ٦ قطع بضاعة!")
                     play_effect("res://audio/reward.ogg")
                     save_progress()
                 else: cannot_afford()
@@ -270,20 +324,25 @@ func interact() -> void:
 func close_contract_board() -> void:
     contract_board_open = false
     player.set_playing(true)
+    hud.set_controls_active(true)
 
 func accept_contract(tier: int) -> void:
-    if package_active or tier < 0 or tier > 2: return
+    if package_active or awaiting_pickup or tier < 0 or tier > 2: return
     if not ContractEconomy.is_unlocked(tier, reputation): return
     var contract_data: Dictionary = ContractEconomy.CONTRACTS[tier]
     contract_tier = tier
     contract_reward = int(contract_data["reward"])
     contract_seconds = float(contract_data["time"])
     var options := ["cafe", "market", "agency"]
-    destination_id = options[(deliveries + tier) % options.size()]
-    package_active = true
-    player.set_package(true)
+    if last_destination_id in options and options.size() > 1:
+        options.erase(last_destination_id)
+    destination_id = options.pick_random()
+    last_destination_id = destination_id
+    awaiting_pickup = true
+    package_active = false
+    player.set_package(false)
     close_contract_board()
-    hud.toast("الطلب في إيدك. روح " + get_point(destination_id)["title"] + " واضغط تفاعل عند الكاونتر.")
+    hud.toast("اتفقنا على الشغلانة. قرّب من الموظف واضغط تفاعل لاستلام الطرد.")
     play_effect("res://audio/reward.ogg")
     save_progress()
 
@@ -294,11 +353,11 @@ func cannot_afford() -> void:
 func complete_delivery() -> void:
     var reward: int = ContractEconomy.payout(contract_reward, contract_seconds)
     cash += reward
-    reputation += 10
+    reputation += 10 if contract_seconds > 0.0 else 5
     deliveries += 1
     package_active = false
     player.set_package(false)
-    hud.toast("وصلت الطلب! +%d جنيه و+١٠ سمعة" % reward)
+    hud.toast("الطلب اتسلّم! +%d جنيه • سمعة +%d" % [reward, 10 if contract_seconds > 0.0 else 5])
     play_effect("res://audio/reward.ogg")
     save_progress()
 
@@ -310,6 +369,8 @@ func save_progress() -> void:
     var state := {
         "cash": cash, "reputation": reputation, "energy": energy,
         "deliveries": deliveries, "package_active": package_active,
+        "awaiting_pickup": awaiting_pickup, "last_destination_id": last_destination_id,
+        "business_stock": business_stock,
         "destination_id": destination_id, "scooter_owned": scooter_owned,
         "business_owned": business_owned,
         "business_clock": business_clock,
@@ -318,10 +379,15 @@ func save_progress() -> void:
         "player_position": [player.position.x, player.position.y, player.position.z],
         "player_yaw": player.rotation.y
     }
-    var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    var staging := SAVE_PATH + ".tmp"
+    var file := FileAccess.open(staging, FileAccess.WRITE)
     if file != null:
         file.store_string(JSON.stringify(state))
+        file.flush()
         file.close()
+        var rename_error := DirAccess.rename_absolute(ProjectSettings.globalize_path(staging), ProjectSettings.globalize_path(SAVE_PATH))
+        if rename_error != OK:
+            push_warning("Saving progress failed with %d" % rename_error)
 
 func load_progress() -> void:
     if not FileAccess.file_exists(SAVE_PATH): return
@@ -336,14 +402,22 @@ func load_progress() -> void:
     energy = clampf(float(data.get("energy", energy)), 0.0, 100.0)
     deliveries = maxi(0, int(data.get("deliveries", deliveries)))
     package_active = bool(data.get("package_active", package_active))
+    awaiting_pickup = bool(data.get("awaiting_pickup", false))
+    last_destination_id = str(data.get("last_destination_id", ""))
     destination_id = str(data.get("destination_id", destination_id))
+    if destination_id not in ["cafe","market","agency"]: destination_id = "cafe"
     scooter_owned = bool(data.get("scooter_owned", scooter_owned))
     business_owned = bool(data.get("business_owned", business_owned))
+    business_stock = clampi(int(data.get("business_stock", 6 if business_owned else 0)), 0, 1000)
     business_clock = float(data.get("business_clock", business_clock))
     contract_tier = clampi(int(data.get("contract_tier", 0)), 0, 2)
     contract_reward = clampi(int(data.get("contract_reward", 95)), 95, 260)
     contract_seconds = maxf(0.0, float(data.get("contract_seconds", 0.0)))
     var pos: Array = data.get("player_position", [])
     if pos.size() == 3:
-        player.position = Vector3(float(pos[0]), maxf(0.1, float(pos[1])), float(pos[2]))
+        player.position = Vector3(clampf(float(pos[0]), -68.0, 68.0),
+                                  clampf(float(pos[1]), 0.1, 8.0),
+                                  clampf(float(pos[2]), -68.0, 68.0))
     player.rotation.y = float(data.get("player_yaw", player.rotation.y))
+    if awaiting_pickup and package_active:
+        awaiting_pickup = false

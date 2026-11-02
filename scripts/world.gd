@@ -170,7 +170,7 @@ func bounds_for(node: Node3D) -> AABB:
                         has_bounds = true
     return bounds
 
-func model(pack: String, identifier: String, location: Vector3, target_width: float, heading: float = 0.0) -> Node3D:
+func model(pack: String, identifier: String, location: Vector3, target_width: float, heading: float = 0.0, target_height: float = 0.0) -> Node3D:
     var prefab := load_asset(pack, identifier)
     if prefab == null: return Node3D.new()
     var holder := Node3D.new()
@@ -182,10 +182,42 @@ func model(pack: String, identifier: String, location: Vector3, target_width: fl
     holder.add_child(scene)
     var b := bounds_for(scene)
     var raw_width := maxf(b.size.x, b.size.z)
-    var scale_factor := target_width / maxf(raw_width, 0.01)
+    # Human figures are sized by HEIGHT (meters), not shoulder width. Previously
+    # using 0.8m as a target *width* made several imported people tiny or huge.
+    var scale_factor := target_height / maxf(b.size.y, 0.01) if target_height > 0.0 else target_width / maxf(raw_width, 0.01)
     scene.scale = Vector3.ONE * scale_factor
+    holder.set_meta("scaled_height", b.size.y * scale_factor)
+    holder.set_meta("scaled_width", raw_width * scale_factor)
     scene.position = Vector3(-b.get_center().x * scale_factor, -b.position.y * scale_factor, -b.get_center().z * scale_factor)
     return holder
+
+func collider_on_model(anchor: Node3D, dimensions: Vector3, center_y: float) -> void:
+    # Keep collision aligned with each mesh, including moving traffic.
+    if anchor == null or not anchor.is_inside_tree(): return
+    var body := StaticBody3D.new()
+    body.collision_layer = 1
+    body.collision_mask = 2
+    body.position.y = center_y
+    anchor.add_child(body)
+    var collision := CollisionShape3D.new()
+    var block := BoxShape3D.new()
+    block.size = dimensions
+    collision.shape = block
+    body.add_child(collision)
+
+func character_collider(anchor: Node3D) -> void:
+    if not anchor.is_inside_tree(): return
+    var body := StaticBody3D.new()
+    body.collision_layer = 1
+    body.collision_mask = 2
+    body.position.y = 0.88
+    anchor.add_child(body)
+    var c := CollisionShape3D.new()
+    var capsule := CapsuleShape3D.new()
+    capsule.radius = 0.28
+    capsule.height = 1.75
+    c.shape = capsule
+    body.add_child(c)
 
 func setup_atmosphere() -> void:
     var world_environment := WorldEnvironment.new()
@@ -271,6 +303,14 @@ func make_district() -> void:
         model("realworld/architecture",residential[i%3],Vector3(x,0,z),14.0 if i%3==0 else 17.0, PI if z > 0 else 0.0)
         invisible_collision(Vector3(x,5.5,z),Vector3(11,11,11))
 
+func interaction_position(poi_id: String) -> Vector3:
+    for index in range(POINTS.size()):
+        var poi: Dictionary = POINTS[index]
+        if poi["id"] == poi_id:
+            var pos: Vector3 = poi["position"]
+            return pos + Vector3(0.0, 0.0, 2.1 if index < 2 else -2.1)
+    return Vector3.ZERO
+
 func build_service_desk(poi: Dictionary, index: int) -> void:
     # Physical street-side interaction counter and parcel, not a beam or stick.
     var p: Vector3=poi["position"]
@@ -297,6 +337,7 @@ func build_service_desk(poi: Dictionary, index: int) -> void:
     sign.modulate=Color("ffe6ad")
     sign.outline_size=5
     kiosk.add_child(sign)
+    collider_on_model(kiosk, Vector3(2.5, 1.1, 0.92), 0.56)
 
 func add_street_details() -> void:
     for side in [-1.0,1.0]:
@@ -323,9 +364,14 @@ func spawn_city_life() -> void:
         Vector3(47,0,5.3), Vector3(15,0,5.3), Vector3(-36,0,5.3),
     ]
     for i in range(stops.size()):
-        var anchor:=model("realworld/vehicles",ids[i%ids.size()],stops[i],4.35 if ids[i%ids.size()] != "pickup" else 5.2,PI if i>2 else 0.0)
+        var width: float = 5.0 if ids[i % ids.size()] == "pickup" else 4.45
+        var anchor := model("realworld/vehicles", ids[i%ids.size()], stops[i], width, PI if i > 2 else 0.0)
+        collider_on_model(anchor, Vector3(width * 0.92, 1.55, 1.9), 0.78)
+        # Cars drive a complete loop along the straight road, never jitter
+        # back and forth by two metres using sin(). Park the rest.
         if i in [0,3]:
-            cars.append({"node":anchor,"start":anchor.position,"phase":i*2.0,"direction":1.0})
+            cars.append({"node":anchor, "start_x":stops[i].x, "z":stops[i].z,
+                         "sign":1.0 if i==0 else -1.0, "speed":3.3 if i==0 else 2.7})
 
 # Architectural pass: actual commercial and residential GLB shells are given
 # authored shopfront geometry (framed glazing, shutters, upper floors, fascia,
@@ -428,22 +474,34 @@ func spawn_animated_people() -> void:
     var actors: Array[String] = ["sam-walk", "harper-walk", "maya-locomotion", "sam-walk", "harper-walk"]
     var positions: Array[Vector3] = [Vector3(-24,0,-19.0),Vector3(22,0,-19.0),Vector3(-24,0,19.0),Vector3(22,0,19.0),Vector3(0,0,17)]
     for i in range(actors.size()):
-        var anchor:=model("realworld/people",actors[i],positions[i],0.78 if i==2 else 0.81,0.0)
-        var all_players:=anchor.find_children("*","AnimationPlayer",true,false)
+        # An adult 1.70–1.85m tall beside 2m doors; child-sized NPCs were caused
+        # by normalizing GLBs to a width of 0.78m instead of actual height.
+        var person_height: float = [1.79, 1.70, 1.66, 1.82, 1.74][i]
+        var anchor := model("realworld/people", actors[i], positions[i], 0.65, 0.0, person_height)
+        anchor.name = ["بائع_الشحن","بائع_القهوة","موظفة_السوبرماركت","صاحب_المشاريع","مارة"][i]
+        var all_players := anchor.find_children("*", "AnimationPlayer", true, false)
+        var animation_player: AnimationPlayer = null
         if not all_players.is_empty():
-            var animation_player:=all_players[0] as AnimationPlayer
-            var clips:=animation_player.get_animation_list()
+            animation_player = all_players[0] as AnimationPlayer
+            var clips := animation_player.get_animation_list()
             if not clips.is_empty():
                 var chosen: String = clips[0]
                 for clip in clips:
-                    var lower:=clip.to_lower()
-                    if "idle" in lower or "relaxed" in lower:
-                        chosen=clip
+                    var lower := String(clip).to_lower()
+                    if i == 4 and ("walk" in lower or "locomotion" in lower):
+                        chosen = clip
+                        break
+                    if i != 4 and ("idle" in lower or "relaxed" in lower):
+                        chosen = clip
                         break
                 animation_player.play(chosen)
-                animation_player.speed_scale=0.9
-        if i == 4:
-            walkers.append({"node":anchor,"origin":positions[i],"phase":1.0,"axis":0})
+                animation_player.speed_scale = 1.0
+        if i < 4:
+            # Counter staff do not wander off or let players ghost through them.
+            character_collider(anchor)
+        else:
+            walkers.append({"node":anchor, "origin":positions[i], "direction":1.0,
+                            "speed":0.95, "distance":0.0, "animation":animation_player})
 
 func configure_graphics(high_quality: bool) -> void:
     if city_sun: city_sun.shadow_enabled = high_quality
@@ -454,12 +512,17 @@ func _process(delta: float) -> void:
     elapsed += delta
     for car in cars:
         var n: Node3D = car["node"]
-        var a: Vector3 = car["start"]
-        n.position = a + Vector3(sin(elapsed*0.13 + car["phase"])*2.0, 0, 0)
+        var start_x: float = float(car["start_x"])
+        var direction: float = float(car["sign"])
+        var track: float = 108.0
+        var progress: float = fposmod((start_x + 54.0 if direction > 0 else 54.0-start_x) + elapsed * float(car["speed"]), track)
+        n.position = Vector3(-54.0 + progress if direction > 0 else 54.0-progress, 0.0, float(car["z"]))
+        n.rotation.y = 0.0 if direction > 0 else PI
     for npc in walkers:
         var actor: Node3D = npc["node"]
-        var origin: Vector3 = npc["origin"]
-        var t := elapsed*1.25 + float(npc["phase"])
-        actor.position = origin + Vector3(sin(t)*2.5 if npc["axis"] == 0 else 0.0, 0.0, sin(t)*2.5 if npc["axis"] == 1 else 0.0)
-        actor.rotation.y = PI/2 if cos(t) >= 0 else -PI/2
-        actor.scale.y = 1.0
+        var base: Vector3 = npc["origin"]
+        # A deliberate 10m sidewalk patrol, oriented along its travel direction.
+        var distance: float = fposmod(elapsed * float(npc["speed"]), 20.0)
+        var relative: float = distance if distance <= 10.0 else 20.0-distance
+        actor.position = base + Vector3(relative-5.0, 0.0, 0.0)
+        actor.rotation.y = -PI * 0.5 if distance <= 10.0 else PI * 0.5

@@ -112,6 +112,8 @@ func set_playing(enabled: bool) -> void:
         touch_move = Vector2.ZERO
         filtered_touch_move = Vector2.ZERO
         look_touch_index = -1
+        run_toggle = false
+        jump_requested = false
     if OS.has_feature("mobile"):
         Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
     else:

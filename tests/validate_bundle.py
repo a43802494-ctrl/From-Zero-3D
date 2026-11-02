@@ -11,7 +11,8 @@ for path in list((root/'scripts').glob('*.gd')) + list((root/'scenes').glob('*.t
     data = path.read_text()
     assert not '\r' in data, path
     for res in re.findall(r'res://([\w./-]+)', data):
-        assert (root/res).is_file(), f'{path}: missing res://{res}'
+        if not res.endswith('/'):
+            assert (root/res).is_file(), f'{path}: missing res://{res}'
 for ogg in (root/'audio').glob('*.ogg'):
     assert ogg.read_bytes().startswith(b'OggS') and ogg.stat().st_size > 500, ogg
 source = (root/'scripts/game.gd').read_text()

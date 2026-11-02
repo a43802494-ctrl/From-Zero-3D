@@ -1,15 +1,19 @@
-name: من الصفر | تحسين رسومات ومهام وتحكم 0.7
+name: من الصفر | إصلاحات الأساس والشخصيات 0.8
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: from-zero-android-main
+  cancel-in-progress: true
+
 jobs:
   android:
     name: Import models, validate controls, export Android
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 18
     container:
       image: barichello/godot-ci:4.6.3
     steps:
@@ -58,22 +62,35 @@ jobs:
         shell: bash
         run: |
           set -eu
-          timeout --signal=TERM 40s godot --headless --path . --script res://tests/economy_tests.gd
-          FROMZERO_TEST_MOBILE=1 timeout --signal=TERM 40s godot --headless --path . --script res://tests/mobile_controls_tests.gd
-          timeout --signal=TERM 120s godot --headless --path . --quit-after 70
+          run_checked_test() {
+            local script="$1" marker="$2" log
+            log="$(mktemp)"
+            if ! timeout --signal=TERM --kill-after=5s 55s godot --headless --path . --script "$script" --quit-after 300 >"$log" 2>&1; then
+              cat "$log"; echo "::error::Failed or timed out: $script"; exit 1
+            fi
+            cat "$log"
+            if ! grep -Fq "$marker" "$log"; then
+              echo "::error::PASS marker missing for $script"; exit 1
+            fi
+          }
+          run_checked_test res://tests/economy_tests.gd "CONTRACT ECONOMY TESTS: PASS"
+          export FROMZERO_TEST_MOBILE=1
+          run_checked_test res://tests/mobile_controls_tests.gd "ARABIC UI + LTR JOYSTICK LEFT + 8-WAY TOUCH: PASS"
+          run_checked_test res://tests/world_scale_tests.gd "WORLD NPC HEIGHT 1.6-1.9m + PHYSICAL VENDORS + TRAFFIC: PASS"
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --quit-after 70
 
       - name: Build Arabic 3D reality pass Android APK
         shell: bash
         run: |
           set -eu
           mkdir -p build
-          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.7-rebuild-debug.apk
-          test -s build/From-Zero-3D-v0.7-rebuild-debug.apk
+          godot --headless --path . --export-debug Android build/From-Zero-3D-v0.8-core-debug.apk
+          test -s build/From-Zero-3D-v0.8-core-debug.apk
 
       - name: Publish internal APK
         uses: actions/upload-artifact@v4
         with:
-          name: From-Zero-3D-v07-RealWorld-Android-debug
-          path: build/From-Zero-3D-v0.7-rebuild-debug.apk
+          name: From-Zero-3D-v08-CoreRepair-Android-debug
+          path: build/From-Zero-3D-v0.8-core-debug.apk
           if-no-files-found: error
           retention-days: 14

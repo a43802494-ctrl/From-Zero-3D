@@ -8,6 +8,11 @@ var offset := Vector2.ZERO
 var center_position := Vector2.ZERO
 var max_radius := 65.0
 var input_vector := Vector2.ZERO
+var controls_enabled := false
+
+func set_controls_enabled(enabled: bool) -> void:
+    controls_enabled = enabled
+    if not enabled: reset()
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -15,7 +20,7 @@ func _ready() -> void:
     center_position = global_position + size * 0.5
 
 func _input(event: InputEvent) -> void:
-    if not visible or not is_inside_tree(): return
+    if not visible or not is_inside_tree() or not controls_enabled: return
     if event is InputEventScreenTouch:
         if event.pressed and active_index == -1 and is_move_zone(event.position):
             active_index = event.index
@@ -44,9 +49,9 @@ func reset() -> void:
     queue_redraw()
 
 func is_move_zone(screen_pos: Vector2) -> bool:
-    var viewport := get_viewport().get_visible_rect().size
-    # Bottom-left quarter reserved for movement. The right half is camera.
-    return screen_pos.x >= 0 and screen_pos.x < viewport.x * 0.38 and screen_pos.y > viewport.y * 0.48 and screen_pos.y <= viewport.y
+    # Don't trigger movement by touching a random area on the left.
+    # Include a small forgiving halo around the circular thumb pad only.
+    return screen_pos.distance_to(global_position + size*0.5) <= minf(size.x,size.y)*0.63
 
 func set_touch_point(screen_pos: Vector2) -> void:
     max_radius = clampf(minf(size.x, size.y) * 0.33, 42.0, 88.0)
